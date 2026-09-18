@@ -1,10 +1,37 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { KillSwitchResult } from './types';
 
+export async function checkGlobalKillSwitch(
+  supabase: SupabaseClient,
+): Promise<KillSwitchResult> {
+  try {
+    const { data, error } = await supabase
+      .from('system_config')
+      .select('value')
+      .eq('key', 'global_kill_switch')
+      .single();
+
+    if (error) {
+      return { enabled: true, reason: 'Failed to check global kill switch status' };
+    }
+
+    if (data && data.value === 'true') {
+      return { enabled: true, reason: 'Global kill switch is activated' };
+    }
+
+    return { enabled: false };
+  } catch {
+    return { enabled: true, reason: 'Global kill switch check failed - defaulting to blocked' };
+  }
+}
+
 export async function checkKillSwitch(
   supabase: SupabaseClient,
   clientId: string,
 ): Promise<KillSwitchResult> {
+  const global = await checkGlobalKillSwitch(supabase);
+  if (global.enabled) return global;
+
   try {
     const { data, error } = await supabase
       .from('clients')

@@ -266,21 +266,27 @@ describe('verify-signature', () => {
   });
 
   describe('Encryption provider not configured', () => {
-    it('throws when encryption provider not set', async () => {
-      setEncryptionProvider(null);
+    it('throws when encryption provider not set and no ENCRYPTION_KEY env', async () => {
+      const originalKey = process.env.ENCRYPTION_KEY;
+      try {
+        delete process.env.ENCRYPTION_KEY;
+        setEncryptionProvider(null);
 
-      const secret = new TextEncoder().encode('test-secret');
-      const body = new TextEncoder().encode('{"event_type":"test","event_id":"123"}');
-      const signature = createHmac('sha256', Buffer.from(secret)).update(Buffer.from(body)).digest('hex');
+        const secret = new TextEncoder().encode('test-secret');
+        const body = new TextEncoder().encode('{"event_type":"test","event_id":"123"}');
+        const signature = createHmac('sha256', Buffer.from(secret)).update(Buffer.from(body)).digest('hex');
 
-      await expect(
-        verifySignature({
-          authType: 'hmac_sha256',
-          rawBody: body,
-          headers: { 'x-signature': signature },
-          encryptedSecret: secret,
-        })
-      ).rejects.toThrow('Encryption provider not configured');
+        await expect(
+          verifySignature({
+            authType: 'hmac_sha256',
+            rawBody: body,
+            headers: { 'x-signature': signature },
+            encryptedSecret: secret,
+          })
+        ).rejects.toThrow('ENCRYPTION_KEY');
+      } finally {
+        if (originalKey !== undefined) process.env.ENCRYPTION_KEY = originalKey;
+      }
     });
   });
 });

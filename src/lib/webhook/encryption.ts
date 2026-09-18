@@ -18,24 +18,51 @@ export function getEncryptionProvider(): EncryptionProvider | null {
   return encryptionProvider;
 }
 
-export async function decryptSecret(encryptedSecret: Uint8Array): Promise<Uint8Array> {
-  const provider = getEncryptionProvider();
-  if (!provider) {
+function ensureEncryptionProvider(): EncryptionProvider {
+  if (encryptionProvider) return encryptionProvider;
+
+  const keyHex = process.env.ENCRYPTION_KEY;
+  if (!keyHex) {
     throw new Error(
-      'Encryption provider not configured. Set a production-safe encryption provider using setEncryptionProvider() before decrypting secrets.'
+      'ENCRYPTION_KEY environment variable is required. ' +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
     );
   }
+
+  const keyBytes = hexToBytes(keyHex);
+  if (keyBytes.length !== 32) {
+    throw new Error(
+      `ENCRYPTION_KEY must be exactly 32 bytes (64 hex characters). Got ${keyBytes.length} bytes.`
+    );
+  }
+
+  encryptionProvider = createAES256GCMProvider({ key: keyBytes });
+  return encryptionProvider;
+}
+
+export async function decryptSecret(encryptedSecret: Uint8Array): Promise<Uint8Array> {
+  const provider = ensureEncryptionProvider();
   return provider.decrypt(encryptedSecret);
 }
 
 export async function encryptSecret(plaintext: Uint8Array): Promise<Uint8Array> {
-  const provider = getEncryptionProvider();
-  if (!provider) {
-    throw new Error(
-      'Encryption provider not configured. Set a production-safe encryption provider using setEncryptionProvider() before encrypting secrets.'
-    );
-  }
+  const provider = ensureEncryptionProvider();
   return provider.encrypt(plaintext);
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
+  if (clean.length % 2 !== 0) {
+    throw new Error('ENCRYPTION_KEY must have an even number of hex characters');
+  }
+  if (!/^[0-9a-fA-F]+$/.test(clean)) {
+    throw new Error('ENCRYPTION_KEY contains invalid hex characters');
+  }
+  const bytes = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < clean.length; i += 2) {
+    bytes[i / 2] = parseInt(clean.substring(i, i + 2), 16);
+  }
+  return bytes;
 }
 
 export function createAES256GCMProvider(config: EncryptionConfig): EncryptionProvider {

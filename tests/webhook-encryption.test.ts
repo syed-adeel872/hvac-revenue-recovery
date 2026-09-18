@@ -27,9 +27,16 @@ describe('encryption', () => {
   });
 
   describe('decryptSecret / encryptSecret', () => {
-    it('throws when provider not configured', async () => {
-      await expect(decryptSecret(new Uint8Array())).rejects.toThrow('Encryption provider not configured');
-      await expect(encryptSecret(new Uint8Array())).rejects.toThrow('Encryption provider not configured');
+    it('throws when provider not configured and no ENCRYPTION_KEY env', async () => {
+      const original = process.env.ENCRYPTION_KEY;
+      try {
+        delete process.env.ENCRYPTION_KEY;
+        setEncryptionProvider(null);
+        await expect(decryptSecret(new Uint8Array())).rejects.toThrow('ENCRYPTION_KEY');
+        await expect(encryptSecret(new Uint8Array())).rejects.toThrow('ENCRYPTION_KEY');
+      } finally {
+        if (original !== undefined) process.env.ENCRYPTION_KEY = original;
+      }
     });
 
     it('delegates to provider when configured', async () => {

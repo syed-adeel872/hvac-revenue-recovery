@@ -253,8 +253,8 @@ BEGIN
         WHEN v_old_status = 'mapped' AND v_new_status IN ('workflow_created', 'retryable_failed') THEN true
         WHEN v_old_status = 'workflow_created' AND v_new_status IN ('completed', 'retryable_failed') THEN true
         WHEN v_old_status = 'retryable_failed' AND v_new_status IN ('processing', 'failed') THEN true
-        WHEN v_old_status = 'completed' AND v_new_status IN () THEN false  -- terminal
-        WHEN v_old_status = 'failed' AND v_new_status IN () THEN false    -- terminal
+        WHEN v_old_status = 'completed' THEN false  -- terminal
+        WHEN v_old_status = 'failed' THEN false    -- terminal
         ELSE false
     END;
 

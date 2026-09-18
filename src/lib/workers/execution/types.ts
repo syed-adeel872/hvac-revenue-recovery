@@ -75,7 +75,6 @@ export interface ProcessBatchResult {
 }
 
 export interface ExecutionOptions {
-  skipKillSwitch?: boolean;
   skipRateLimit?: boolean;
   skipCircuitBreaker?: boolean;
   rateLimitOptions?: { hourly?: number; daily?: number };

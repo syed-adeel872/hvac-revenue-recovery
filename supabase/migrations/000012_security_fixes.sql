@@ -317,12 +317,14 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 -- ============================================================
 -- Fix 14: Final security audit log entry
 -- ============================================================
-INSERT INTO system_audit_logs (action, resource_type, resource_id, metadata)
+INSERT INTO system_audit_logs (actor_type, action, resource_type, resource_id, metadata)
 VALUES (
+    'system',
     'migration_complete',
     'database',
-    '000012_security_fixes',
+    NULL,
     jsonb_build_object(
+        'migration', '000012_security_fixes',
         'migrations_applied', 12,
         'timestamp', now(),
         'version', '1.0.0'

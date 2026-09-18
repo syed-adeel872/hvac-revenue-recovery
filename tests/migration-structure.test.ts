@@ -14,8 +14,8 @@ describe('Migration Structure', () => {
     migrationFiles.push(...files);
   });
 
-  it('should have exactly 15 migration files', () => {
-    expect(migrationFiles.length).toBe(15);
+  it('should have exactly 16 migration files', () => {
+    expect(migrationFiles.length).toBe(16);
   });
 
   it('should have sequential migration numbering', () => {
@@ -35,6 +35,7 @@ describe('Migration Structure', () => {
       '000013_',
       '000014_',
       '000015_',
+      '000016_',
     ];
 
     expectedPrefixes.forEach((prefix, i) => {
@@ -59,6 +60,7 @@ describe('Migration Structure', () => {
       '000013_webhook_ingestion.sql',
       '000014_kill_switch.sql',
       '000015_hardening_fixes.sql',
+      '000016_production_hardening.sql',
     ];
 
     expect(migrationFiles).toEqual(expectedNames);
@@ -157,6 +159,7 @@ describe('Migration Structure', () => {
       '000013_webhook_ingestion',
       '000014_kill_switch',
       '000015_hardening_fixes',
+      '000016_production_hardening',
     ];
 
     migrationFiles.forEach((file, i) => {

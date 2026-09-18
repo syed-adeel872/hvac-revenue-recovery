@@ -262,10 +262,10 @@ BEGIN
         WHEN v_current_status = 'approved' AND p_new_status IN ('executing', 'cancelled', 'expired') THEN true
         WHEN v_current_status = 'rejected' AND p_new_status IN ('cancelled') THEN true
         WHEN v_current_status = 'executing' AND p_new_status IN ('completed', 'failed', 'cancelled') THEN true
-        WHEN v_current_status = 'completed' AND p_new_status IN () THEN false  -- terminal
-        WHEN v_current_status = 'failed' AND p_new_status IN () THEN false    -- terminal
-        WHEN v_current_status = 'cancelled' AND p_new_status IN () THEN false -- terminal
-        WHEN v_current_status = 'expired' AND p_new_status IN () THEN false   -- terminal
+        WHEN v_current_status = 'completed' THEN false  -- terminal
+        WHEN v_current_status = 'failed' THEN false    -- terminal
+        WHEN v_current_status = 'cancelled' THEN false -- terminal
+        WHEN v_current_status = 'expired' THEN false   -- terminal
         ELSE false
     END;
 

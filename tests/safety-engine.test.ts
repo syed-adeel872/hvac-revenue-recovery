@@ -13,7 +13,7 @@ vi.mock('@/lib/safety/policy-engine', async () => {
   const actual = await vi.importActual('@/lib/safety/policy-engine');
   return {
     ...actual,
-    loadClientPolicies: vi.fn(),
+    loadClientPolicies: vi.fn().mockResolvedValue([]),
   };
 });
 

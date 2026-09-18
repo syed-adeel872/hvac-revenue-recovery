@@ -4,7 +4,7 @@ import { dispatchMessage } from './dispatch';
 import { MessagingAdapter } from './adapters';
 import { checkKillSwitch } from '@/lib/safety/resilience/kill-switch';
 import { checkRateLimit } from '@/lib/safety/resilience/rate-limiter';
-import { CircuitBreaker } from '@/lib/safety/resilience/circuit-breaker';
+import { PersistentCircuitBreaker } from '@/lib/safety/resilience/persistent-circuit-breaker';
 import { evaluateSafety } from '@/lib/safety/evaluate-safety';
 import {
   ClaimedRecoveryAction,
@@ -13,18 +13,8 @@ import {
   ExecutionOptions,
 } from './types';
 
-const tenantCircuitBreakers = new Map<string, CircuitBreaker>();
-
-function getTenantCircuitBreaker(clientId: string): CircuitBreaker {
-  let cb = tenantCircuitBreakers.get(clientId);
-  if (!cb) {
-    cb = new CircuitBreaker({
-      failureThreshold: 5,
-      recoveryTimeoutMs: 30000,
-    });
-    tenantCircuitBreakers.set(clientId, cb);
-  }
-  return cb;
+function getTenantCircuitBreaker(supabase: SupabaseClient, clientId: string): PersistentCircuitBreaker {
+  return new PersistentCircuitBreaker(supabase, clientId);
 }
 
 function buildSafetyContext(action: ClaimedRecoveryAction) {
@@ -124,14 +114,12 @@ export async function processRecoveryAction(
     status: 'failed',
   };
 
-  if (!options.skipKillSwitch) {
-    const killSwitch = await checkKillSwitch(supabase, action.clientId);
-    result.killSwitch = killSwitch;
-    if (killSwitch.enabled) {
-      await markActionFailed(supabase, action.id, action.clientId, killSwitch.reason ?? 'Kill switch activated');
-      result.error = killSwitch.reason ?? 'Kill switch activated';
-      return result;
-    }
+  const killSwitch = await checkKillSwitch(supabase, action.clientId);
+  result.killSwitch = killSwitch;
+  if (killSwitch.enabled) {
+    await markActionFailed(supabase, action.id, action.clientId, killSwitch.reason ?? 'Kill switch activated');
+    result.error = killSwitch.reason ?? 'Kill switch activated';
+    return result;
   }
 
   try {
@@ -179,9 +167,9 @@ export async function processRecoveryAction(
   }
 
   if (!options.skipCircuitBreaker) {
-    const cb = getTenantCircuitBreaker(action.clientId);
-    if (!cb.canExecute()) {
-      const snapshot = cb.getState();
+    const cb = getTenantCircuitBreaker(supabase, action.clientId);
+    if (!(await cb.canExecute())) {
+      const snapshot = await cb.getState();
       result.circuitBreaker = snapshot;
       await markActionFailed(supabase, action.id, action.clientId, 'Circuit breaker is open');
       result.error = 'Circuit breaker is open';
@@ -193,20 +181,20 @@ export async function processRecoveryAction(
     const dispatchResult = await dispatchMessage(supabase, action, adapter);
 
     if (!dispatchResult.success) {
-      getTenantCircuitBreaker(action.clientId).recordFailure();
+      await getTenantCircuitBreaker(supabase, action.clientId).recordFailure();
       await markActionFailed(supabase, action.id, action.clientId, dispatchResult.error ?? 'Dispatch failed');
       result.error = dispatchResult.error;
       return result;
     }
 
-    getTenantCircuitBreaker(action.clientId).recordSuccess();
+    await getTenantCircuitBreaker(supabase, action.clientId).recordSuccess();
     await markActionCompleted(supabase, action.id, action.clientId);
     result.status = 'completed';
     result.messageId = dispatchResult.messageId;
     result.externalId = dispatchResult.externalId;
     return result;
   } catch (error) {
-    getTenantCircuitBreaker(action.clientId).recordFailure();
+    await getTenantCircuitBreaker(supabase, action.clientId).recordFailure();
     const errorMsg = error instanceof Error ? error.message : 'Unknown dispatch error';
     await markActionFailed(supabase, action.id, action.clientId, errorMsg);
     result.error = errorMsg;
@@ -259,10 +247,14 @@ export async function processBatch(
   };
 }
 
-export function getTenantCircuitBreakerForClient(clientId: string): CircuitBreaker {
-  return getTenantCircuitBreaker(clientId);
+export function getTenantCircuitBreakerForClient(
+  supabase: SupabaseClient,
+  clientId: string,
+): PersistentCircuitBreaker {
+  return getTenantCircuitBreaker(supabase, clientId);
 }
 
 export function resetTenantCircuitBreakers(): void {
-  tenantCircuitBreakers.clear();
+  // No-op: circuit breaker state is now persisted in the database.
+  // Individual tenant resets should use PersistentCircuitBreaker.reset().
 }

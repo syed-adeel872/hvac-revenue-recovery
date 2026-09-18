@@ -231,8 +231,8 @@ it('should have GRANTs to authenticated role only', () => {
     expect(allContent).toMatch(/v_old_status = 'workflow_created' AND v_new_status IN \('completed', 'retryable_failed'\)/);
     expect(allContent).toMatch(/v_old_status = 'retryable_failed' AND v_new_status IN \('processing', 'failed'\)/);
     // Terminal states
-    expect(allContent).toMatch(/v_old_status = 'completed' AND v_new_status IN \(\)/);
-    expect(allContent).toMatch(/v_old_status = 'failed' AND v_new_status IN \(\)/);
+    expect(allContent).toMatch(/v_old_status = 'completed' THEN false/);
+    expect(allContent).toMatch(/v_old_status = 'failed' THEN false/);
     // Audit logging
     expect(allContent).toMatch(/INSERT INTO audit_logs/);
     expect(allContent).toMatch(/ingestion_status_transition/);

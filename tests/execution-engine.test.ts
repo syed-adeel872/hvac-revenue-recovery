@@ -18,6 +18,18 @@ vi.mock('@/lib/safety/evaluate-safety', () => ({
   evaluateSafety: vi.fn(),
 }));
 
+vi.mock('@/lib/safety/resilience/persistent-circuit-breaker', () => {
+  return {
+    PersistentCircuitBreaker: class MockPersistentCircuitBreaker {
+      canExecute = vi.fn().mockResolvedValue(true);
+      recordSuccess = vi.fn().mockResolvedValue(undefined);
+      recordFailure = vi.fn().mockResolvedValue(undefined);
+      getState = vi.fn().mockResolvedValue({ state: 'CLOSED', failureCount: 0, lastFailureTime: null });
+      reset = vi.fn().mockResolvedValue(undefined);
+    },
+  };
+});
+
 vi.mock('@/lib/workers/execution/claim-actions', () => ({
   claimRecoveryActions: vi.fn(),
 }));
@@ -156,14 +168,6 @@ describe('processRecoveryAction', () => {
     const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter);
     expect(result.status).toBe('failed');
     expect(result.error).toContain('Rate limit');
-  });
-
-  it('skips kill switch when option set', async () => {
-    (checkKillSwitch as any).mockResolvedValue({ enabled: true });
-    const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter, {
-      skipKillSwitch: true,
-    });
-    expect(result.killSwitch).toBeUndefined();
   });
 
   it('skips rate limit when option set', async () => {

@@ -5,7 +5,7 @@ import { processBatch as processRecoveryBatch } from '@/lib/workers/recovery/eng
 import { processBatch as processExecutionBatch, resetTenantCircuitBreakers } from '@/lib/workers/execution/engine';
 import { processBatch as processOperationsBatch } from '@/lib/workers/operations/engine';
 import { MockMessagingAdapter, MessagingAdapter } from '@/lib/workers/execution/adapters';
-import { checkKillSwitch } from '@/lib/safety/resilience/kill-switch';
+import { checkKillSwitch, checkGlobalKillSwitch } from '@/lib/safety/resilience/kill-switch';
 
 export interface PipelineStageResult {
   stage: string;
@@ -94,15 +94,28 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   if (!skipStages.includes('intelligence')) {
     try {
-      const result = await processIntelligenceBatch({ supabase, clientId, batchSize });
-      stages.push({
-        stage: 'intelligence',
-        success: result.failed === 0,
-        total: result.total,
-        succeeded: result.succeeded,
-        failed: result.failed,
-      });
-      if (result.failed > 0) pipelineSuccess = false;
+      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      if (interStageKillSwitch.enabled) {
+        stages.push({
+          stage: 'intelligence',
+          success: false,
+          total: 0,
+          succeeded: 0,
+          failed: 0,
+          error: interStageKillSwitch.reason ?? 'Kill switch activated between stages',
+        });
+        pipelineSuccess = false;
+      } else {
+        const result = await processIntelligenceBatch({ supabase, clientId, batchSize });
+        stages.push({
+          stage: 'intelligence',
+          success: result.failed === 0,
+          total: result.total,
+          succeeded: result.succeeded,
+          failed: result.failed,
+        });
+        if (result.failed > 0) pipelineSuccess = false;
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       stages.push({
@@ -119,15 +132,28 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   if (!skipStages.includes('recovery')) {
     try {
-      const result = await processRecoveryBatch({ supabase, clientId, batchSize });
-      stages.push({
-        stage: 'recovery',
-        success: result.failed === 0,
-        total: result.total,
-        succeeded: result.succeeded,
-        failed: result.failed,
-      });
-      if (result.failed > 0) pipelineSuccess = false;
+      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      if (interStageKillSwitch.enabled) {
+        stages.push({
+          stage: 'recovery',
+          success: false,
+          total: 0,
+          succeeded: 0,
+          failed: 0,
+          error: interStageKillSwitch.reason ?? 'Kill switch activated between stages',
+        });
+        pipelineSuccess = false;
+      } else {
+        const result = await processRecoveryBatch({ supabase, clientId, batchSize });
+        stages.push({
+          stage: 'recovery',
+          success: result.failed === 0,
+          total: result.total,
+          succeeded: result.succeeded,
+          failed: result.failed,
+        });
+        if (result.failed > 0) pipelineSuccess = false;
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       stages.push({
@@ -144,16 +170,29 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   if (!skipStages.includes('execution')) {
     try {
-      const result = await processExecutionBatch(supabase, clientId, adapter, { batchSize });
-      stages.push({
-        stage: 'execution',
-        success: result.failed === 0 && result.rejected === 0,
-        total: result.total,
-        succeeded: result.succeeded,
-        failed: result.failed,
-        rejected: result.rejected,
-      });
-      if (result.failed > 0 || result.rejected > 0) pipelineSuccess = false;
+      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      if (interStageKillSwitch.enabled) {
+        stages.push({
+          stage: 'execution',
+          success: false,
+          total: 0,
+          succeeded: 0,
+          failed: 0,
+          error: interStageKillSwitch.reason ?? 'Kill switch activated between stages',
+        });
+        pipelineSuccess = false;
+      } else {
+        const result = await processExecutionBatch(supabase, clientId, adapter, { batchSize });
+        stages.push({
+          stage: 'execution',
+          success: result.failed === 0 && result.rejected === 0,
+          total: result.total,
+          succeeded: result.succeeded,
+          failed: result.failed,
+          rejected: result.rejected,
+        });
+        if (result.failed > 0 || result.rejected > 0) pipelineSuccess = false;
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       stages.push({
@@ -170,15 +209,28 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   if (!skipStages.includes('operations')) {
     try {
-      const result = await processOperationsBatch(supabase, [clientId]);
-      stages.push({
-        stage: 'operations',
-        success: result.failed === 0,
-        total: result.total,
-        succeeded: result.succeeded,
-        failed: result.failed,
-      });
-      if (result.failed > 0) pipelineSuccess = false;
+      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      if (interStageKillSwitch.enabled) {
+        stages.push({
+          stage: 'operations',
+          success: false,
+          total: 0,
+          succeeded: 0,
+          failed: 0,
+          error: interStageKillSwitch.reason ?? 'Kill switch activated between stages',
+        });
+        pipelineSuccess = false;
+      } else {
+        const result = await processOperationsBatch(supabase, [clientId]);
+        stages.push({
+          stage: 'operations',
+          success: result.failed === 0,
+          total: result.total,
+          succeeded: result.succeeded,
+          failed: result.failed,
+        });
+        if (result.failed > 0) pipelineSuccess = false;
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       stages.push({

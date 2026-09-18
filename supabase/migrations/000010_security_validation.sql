@@ -11,11 +11,9 @@ DECLARE
     v_policy record;
     v_issues text := '';
 BEGIN
-    -- Check all RLS policies for x-client-id usage
     FOR v_policy IN
         SELECT polname, polrelid::regclass AS table_name, pg_get_expr(polqual, polrelid) AS using_expr
         FROM pg_policy
-        WHERE schemaname = 'public'
     LOOP
         IF v_policy.using_expr ILIKE '%x-client-id%' OR
            v_policy.using_expr ILIKE '%request.header%' OR
@@ -41,10 +39,9 @@ BEGIN
     FOR v_constraint IN
         SELECT conname, conrelid::regclass AS table_name, pg_get_constraintdef(oid) AS def
         FROM pg_constraint
-        WHERE contype = 'c'  -- CHECK constraints
+        WHERE contype = 'c'
         AND connamespace = 'public'::regnamespace
     LOOP
-        -- Check for subqueries or cross-table references
         IF v_constraint.def ILIKE '%SELECT%' OR
            v_constraint.def ILIKE '%EXISTS%' OR
            v_constraint.def ILIKE '%IN (SELECT%' THEN
@@ -73,7 +70,8 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-    v_tbl record;
+    v_tbl text;
+    v_policy record;
     v_policy_count integer;
     v_issues text;
 BEGIN
@@ -96,7 +94,7 @@ BEGIN
         IF NOT EXISTS (
             SELECT 1 FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relname = v_tbl.tablename
+            WHERE c.relname = v_tbl
             AND n.nspname = 'public'
             AND c.relrowsecurity = true
         ) THEN
@@ -106,7 +104,7 @@ BEGIN
         -- Count policies
         SELECT count(*) INTO v_policy_count
         FROM pg_policy
-        WHERE polrelid = v_tbl.tablename::regclass;
+        WHERE polrelid = v_tbl::regclass;
 
         IF v_policy_count = 0 THEN
             v_issues := v_issues || 'No RLS policies; ';
@@ -116,7 +114,7 @@ BEGIN
         FOR v_policy IN
             SELECT polname, pg_get_expr(polqual, polrelid) AS using_expr
             FROM pg_policy
-            WHERE polrelid = v_tbl.tablename::regclass
+            WHERE polrelid = v_tbl::regclass
         LOOP
             IF v_policy.using_expr = 'true' OR v_policy.using_expr ILIKE '%true%' THEN
                 v_issues := v_issues || 'Policy ' || v_policy.polname || ' uses USING (true); ';

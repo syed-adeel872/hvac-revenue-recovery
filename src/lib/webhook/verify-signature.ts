@@ -59,7 +59,10 @@ async function verifyHMAC(options: HMACVerificationOptions): Promise<Verificatio
 
     return { valid: true };
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Encryption provider not configured')) {
+    if (error instanceof Error && (
+      error.message.includes('Encryption provider not configured') ||
+      error.message.includes('ENCRYPTION_KEY')
+    )) {
       throw error;
     }
     return {
@@ -94,7 +97,10 @@ async function verifyBearerToken(options: BearerTokenOptions): Promise<Verificat
 
     return { valid: true };
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Encryption provider not configured')) {
+    if (error instanceof Error && (
+      error.message.includes('Encryption provider not configured') ||
+      error.message.includes('ENCRYPTION_KEY')
+    )) {
       throw error;
     }
     return {
@@ -147,7 +153,10 @@ async function verifyBasicAuth(options: BasicAuthOptions): Promise<VerificationR
 
     return { valid: true };
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Encryption provider not configured')) {
+    if (error instanceof Error && (
+      error.message.includes('Encryption provider not configured') ||
+      error.message.includes('ENCRYPTION_KEY')
+    )) {
       throw error;
     }
     return {

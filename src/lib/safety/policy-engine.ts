@@ -5,31 +5,45 @@ export async function loadClientPolicies(
   supabase: SupabaseClient,
   clientId: string
 ): Promise<ClientPolicy[]> {
-  try {
-    const { data, error } = await supabase
-      .from('worker_authorizations')
-      .select('id, worker_type, scope, metadata, status')
-      .eq('client_id', clientId)
-      .eq('worker_type', 'safety')
-      .eq('status', 'active');
+  const { data, error } = await supabase
+    .from('worker_authorizations')
+    .select('id, worker_type, scope, metadata, status')
+    .eq('client_id', clientId)
+    .eq('worker_type', 'safety')
+    .eq('status', 'active');
 
-    if (error || !data) return [];
+  if (error) {
+    throw new Error(`Failed to load client policies: ${error.message}`);
+  }
 
-    return data.map((row) => ({
-      id: row.id,
-      name: `safety_${row.worker_type}`,
-      type: 'worker_auth',
-      decision: 'ALLOW' as SafetyDecision,
-      priority: 100,
-      enabled: true,
-      config: {
-        scope: row.scope,
-        metadata: row.metadata,
-      },
-    }));
-  } catch {
+  if (!data || data.length === 0) {
     return [];
   }
+
+  return data.map((row) => ({
+    id: row.id,
+    name: `safety_${row.worker_type}`,
+    type: 'worker_auth',
+    decision: deriveDecisionFromScope(row.scope),
+    priority: 100,
+    enabled: true,
+    config: {
+      scope: row.scope,
+      metadata: row.metadata,
+    },
+  }));
+}
+
+function deriveDecisionFromScope(scope: string | null): SafetyDecision {
+  if (!scope) return 'ESCALATE';
+  const normalized = scope.toLowerCase().trim();
+  if (normalized === 'full' || normalized === 'all' || normalized === 'allow') {
+    return 'ALLOW';
+  }
+  if (normalized === 'deny' || normalized === 'block' || normalized === 'restricted') {
+    return 'BLOCK';
+  }
+  return 'ESCALATE';
 }
 
 export function evaluateRateLimit(

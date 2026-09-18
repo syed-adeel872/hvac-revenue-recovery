@@ -38,7 +38,7 @@ END $$;
 DROP POLICY IF EXISTS clients_select_tenant ON clients;
 CREATE POLICY clients_select_tenant ON clients
     FOR SELECT
-    USING (client_id = get_current_tenant_id() AND deleted_at IS NULL);
+    USING (id = get_current_tenant_id() AND deleted_at IS NULL);
 
 -- ============================================================
 -- 3. circuit_breaker_state — persistent circuit breaker for workers
@@ -111,12 +111,14 @@ CREATE INDEX IF NOT EXISTS idx_circuit_breaker_state_client
 -- ============================================================
 -- 7. Audit log
 -- ============================================================
-INSERT INTO system_audit_logs (action, resource_type, resource_id, metadata)
+INSERT INTO system_audit_logs (actor_type, action, resource_type, resource_id, metadata)
 VALUES (
+    'system',
     'migration_complete',
     'database',
-    '000016_production_hardening',
+    NULL,
     jsonb_build_object(
+        'migration', '000016_production_hardening',
         'migrations_applied', 16,
         'timestamp', now(),
         'version', '1.0.0'

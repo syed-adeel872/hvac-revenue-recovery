@@ -25,6 +25,7 @@ vi.mock('@/lib/workers/operations/engine', () => ({
 
 vi.mock('@/lib/safety/resilience/kill-switch', () => ({
   checkKillSwitch: vi.fn(),
+  checkGlobalKillSwitch: vi.fn().mockResolvedValue({ enabled: false }),
 }));
 
 import { processBatchOnce } from '@/lib/webhook/processor';
@@ -32,7 +33,7 @@ import { processBatch as processIntelligenceBatch } from '@/lib/workers/intellig
 import { processBatch as processRecoveryBatch } from '@/lib/workers/recovery/engine';
 import { processBatch as processExecutionBatch } from '@/lib/workers/execution/engine';
 import { processBatch as processOperationsBatch } from '@/lib/workers/operations/engine';
-import { checkKillSwitch } from '@/lib/safety/resilience/kill-switch';
+import { checkKillSwitch, checkGlobalKillSwitch } from '@/lib/safety/resilience/kill-switch';
 
 function createMockSupabase() {
   return {} as any;
@@ -48,6 +49,7 @@ describe('runPipeline', () => {
     adapter = new MockMessagingAdapter();
 
     (checkKillSwitch as any).mockResolvedValue({ enabled: false });
+    (checkGlobalKillSwitch as any).mockResolvedValue({ enabled: false });
     (processBatchOnce as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, retried: 0 });
     (processIntelligenceBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processRecoveryBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
@@ -203,6 +205,7 @@ describe('runMultiTenantPipeline', () => {
     adapter = new MockMessagingAdapter();
 
     (checkKillSwitch as any).mockResolvedValue({ enabled: false });
+    (checkGlobalKillSwitch as any).mockResolvedValue({ enabled: false });
     (processBatchOnce as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, retried: 0 });
     (processIntelligenceBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processRecoveryBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
@@ -266,6 +269,7 @@ describe('multi-tenant isolation verification', () => {
     adapter = new MockMessagingAdapter();
 
     (checkKillSwitch as any).mockResolvedValue({ enabled: false });
+    (checkGlobalKillSwitch as any).mockResolvedValue({ enabled: false });
     (processBatchOnce as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, retried: 0 });
     (processIntelligenceBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processRecoveryBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
