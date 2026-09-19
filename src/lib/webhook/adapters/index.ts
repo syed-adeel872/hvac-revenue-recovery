@@ -1,8 +1,9 @@
 export { GenericHMACAdapter, type GenericHMACConfig, type ExtractedEventInfo } from './generic-hmac';
 export { BearerTokenAdapter, type BearerTokenConfig } from './bearer-token';
 export { BasicAuthAdapter, type BasicAuthConfig } from './basic-auth';
+export { ServiceTitanAdapter, type ServiceTitanAdapterConfig } from './servicetitan';
 
-export type AuthType = 'hmac_sha256' | 'hmac_sha1' | 'bearer_token' | 'basic_auth';
+export type AuthType = 'hmac_sha256' | 'hmac_sha1' | 'bearer_token' | 'basic_auth' | 'servicetitan';
 
 export interface ProviderAdapter {
   verify(
@@ -45,6 +46,12 @@ export function createAdapter(authType: AuthType, config: Record<string, unknown
         eventTypeField: config.eventTypeField as string,
         externalEventIdField: config.externalEventIdField as string,
         timestampField: config.timestampField as string | undefined,
+      });
+    }
+    case 'servicetitan': {
+      const { ServiceTitanAdapter } = require('./servicetitan');
+      return new ServiceTitanAdapter({
+        signatureHeader: (config.headerName as string) || 'x-st-webhook-signature',
       });
     }
     default:

@@ -1,11 +1,12 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { processBatchOnce } from '@/lib/webhook/processor';
 import { processBatch as processIntelligenceBatch } from '@/lib/workers/intelligence/engine';
-import { processBatch as processRecoveryBatch } from '@/lib/workers/recovery/engine';
+import { processBatch as processRecoveryBatch, processInboundMessages } from '@/lib/workers/recovery/engine';
 import { processBatch as processExecutionBatch, resetTenantCircuitBreakers } from '@/lib/workers/execution/engine';
 import { processBatch as processOperationsBatch } from '@/lib/workers/operations/engine';
 import { MockMessagingAdapter, MessagingAdapter } from '@/lib/workers/execution/adapters';
-import { checkKillSwitch, checkGlobalKillSwitch } from '@/lib/safety/resilience/kill-switch';
+import { createMessagingAdapter } from '@/lib/messaging';
+import { checkKillSwitch } from '@/lib/safety/resilience/kill-switch';
 
 export interface PipelineStageResult {
   stage: string;
@@ -38,7 +39,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
     supabase,
     clientId,
     batchSize = 10,
-    adapter = new MockMessagingAdapter(),
+    adapter = createMessagingAdapter(),
     skipStages = [],
   } = options;
 
@@ -92,9 +93,47 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
     }
   }
 
+  if (!skipStages.includes('inbound')) {
+    try {
+      const interStageKillSwitch = await checkKillSwitch(supabase, clientId);
+      if (interStageKillSwitch.enabled) {
+        stages.push({
+          stage: 'inbound',
+          success: false,
+          total: 0,
+          succeeded: 0,
+          failed: 0,
+          error: interStageKillSwitch.reason ?? 'Kill switch activated between stages',
+        });
+        pipelineSuccess = false;
+      } else {
+        const result = await processInboundMessages({ supabase, clientId, batchSize });
+        stages.push({
+          stage: 'inbound',
+          success: result.failed === 0,
+          total: result.total,
+          succeeded: result.succeeded,
+          failed: result.failed,
+        });
+        if (result.failed > 0) pipelineSuccess = false;
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      stages.push({
+        stage: 'inbound',
+        success: false,
+        total: 0,
+        succeeded: 0,
+        failed: 0,
+        error: msg,
+      });
+      pipelineSuccess = false;
+    }
+  }
+
   if (!skipStages.includes('intelligence')) {
     try {
-      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      const interStageKillSwitch = await checkKillSwitch(supabase, clientId);
       if (interStageKillSwitch.enabled) {
         stages.push({
           stage: 'intelligence',
@@ -132,7 +171,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   if (!skipStages.includes('recovery')) {
     try {
-      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      const interStageKillSwitch = await checkKillSwitch(supabase, clientId);
       if (interStageKillSwitch.enabled) {
         stages.push({
           stage: 'recovery',
@@ -170,7 +209,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   if (!skipStages.includes('execution')) {
     try {
-      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      const interStageKillSwitch = await checkKillSwitch(supabase, clientId);
       if (interStageKillSwitch.enabled) {
         stages.push({
           stage: 'execution',
@@ -209,7 +248,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   if (!skipStages.includes('operations')) {
     try {
-      const interStageKillSwitch = await checkGlobalKillSwitch(supabase);
+      const interStageKillSwitch = await checkKillSwitch(supabase, clientId);
       if (interStageKillSwitch.enabled) {
         stages.push({
           stage: 'operations',
