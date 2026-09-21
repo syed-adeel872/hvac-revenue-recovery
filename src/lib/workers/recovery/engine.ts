@@ -1,8 +1,10 @@
 import { evaluateSafety } from '@/lib/safety/evaluate-safety';
+import { recordOptOut } from '@/lib/safety/consent-checker';
 import { IntelligenceOutput } from '../intelligence/types';
 import { classifyIntent } from './classify-intent';
-import { draftResponse, validateDraftConstraints } from './draft-response';
+import { draftResponse, validateDraftConstraints, DraftResponseOutput } from './draft-response';
 import { claimIntelligenceActions, claimInboundMessages, getConversationHistory } from './claim-actions';
+import { transitionActionStatus } from '../transition-status';
 import {
   RecoveryInput,
   RecoveryOutput,
@@ -35,6 +37,16 @@ export async function processRecovery(
       intent = mapStrategyToIntent(intelligenceOutput.recommendedStrategy);
     }
 
+    if (intent === 'opt_out' && action.customerId) {
+      const channel = inboundMessage?.channel || 'sms';
+      const safetyChannel = CHANNEL_MAP[channel] || 'sms';
+      try {
+        await recordOptOut(supabase, action.clientId, action.customerId, safetyChannel);
+      } catch (optOutError) {
+        console.error('[Recovery] Failed to record opt-out:', optOutError instanceof Error ? optOutError.message : 'Unknown error');
+      }
+    }
+
     let conversationContext = undefined;
     if (action.conversationId) {
       const history = await getConversationHistory(supabase, action.clientId, action.conversationId);
@@ -57,9 +69,12 @@ export async function processRecovery(
       conversationContext,
       estimateAmount,
       estimateId: action.estimateId,
+      supabase,
+      clientId: action.clientId,
+      correlationId: action.id,
     });
 
-    const validation = validateDraftConstraints(draft);
+    const validation = validateDraftConstraints(draft, { estimateAmount });
     if (!validation.valid) {
       await markActionFailed(supabase, action, validation.errors.join(', '));
       return {
@@ -80,6 +95,7 @@ export async function processRecovery(
         intent,
         confidence: intelligenceOutput.confidence,
         estimatedRevenue: intelligenceOutput.estimatedRevenue,
+        messageContent: inboundMessage?.content,
       },
     });
 
@@ -174,6 +190,7 @@ async function createRecoveryAction(
   approvalRequired: boolean,
 ): Promise<string> {
   const idempotencyKey = `recovery:${originalAction.id}`;
+  const traceId = (originalAction as any).metadata?.trace_id ?? originalAction.id;
 
   const customerContact = originalAction.customerId
     ? await lookupCustomerContact(supabase, originalAction.clientId, originalAction.customerId)
@@ -209,6 +226,7 @@ async function createRecoveryAction(
         confidence: output.confidence,
       },
       idempotency_key: idempotencyKey,
+      metadata: { trace_id: traceId },
     })
     .select('id')
     .single();
@@ -221,51 +239,15 @@ async function createRecoveryAction(
 }
 
 async function markActionCompleted(supabase: any, action: ClaimedAction): Promise<void> {
-  const { error } = await supabase
-    .from('actions')
-    .update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', action.id)
-    .eq('client_id', action.clientId);
-
-  if (error) {
-    throw new Error(`Failed to mark action as completed: ${error.message}`);
-  }
+  await transitionActionStatus(supabase, action.id, 'completed', 'recovery-worker');
 }
 
 async function markActionRejected(supabase: any, action: ClaimedAction, reason: string): Promise<void> {
-  const { error } = await supabase
-    .from('actions')
-    .update({
-      status: 'rejected',
-      rejection_reason: reason,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', action.id)
-    .eq('client_id', action.clientId);
-
-  if (error) {
-    throw new Error(`Failed to mark action as rejected: ${error.message}`);
-  }
+  await transitionActionStatus(supabase, action.id, 'rejected', 'recovery-worker', undefined, reason);
 }
 
 async function markActionFailed(supabase: any, action: ClaimedAction, errorMessage: string): Promise<void> {
-  const { error } = await supabase
-    .from('actions')
-    .update({
-      status: 'failed',
-      error_message: errorMessage,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', action.id)
-    .eq('client_id', action.clientId);
-
-  if (error) {
-    throw new Error(`Failed to mark action as failed: ${error.message}`);
-  }
+  await transitionActionStatus(supabase, action.id, 'failed', 'recovery-worker', undefined, errorMessage);
 }
 
 export interface ProcessBatchOptions {
@@ -303,4 +285,139 @@ export async function processBatch(options: ProcessBatchOptions): Promise<Proces
     failed: results.filter((r) => !r.success).length,
     results,
   };
+}
+
+export interface ProcessInboundMessagesOptions {
+  supabase: any;
+  clientId: string;
+  batchSize?: number;
+}
+
+export interface ProcessInboundMessagesResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+}
+
+export async function processInboundMessages(
+  options: ProcessInboundMessagesOptions
+): Promise<ProcessInboundMessagesResult> {
+  const { supabase, clientId, batchSize = 10 } = options;
+
+  const messages = await claimInboundMessages({ supabase, clientId, batchSize });
+
+  if (messages.length === 0) {
+    return { total: 0, succeeded: 0, failed: 0 };
+  }
+
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const msg of messages) {
+    try {
+      const intent = classifyIntent(msg.content);
+
+      if (intent === 'opt_out') {
+        try {
+          await recordOptOut(supabase, clientId, msg.customerId, msg.channel as 'sms' | 'email' | 'phone_call');
+        } catch (optOutError) {
+          console.error('[Recovery] Failed to record inbound opt-out:', optOutError instanceof Error ? optOutError.message : 'Unknown error');
+        }
+      }
+
+      const conversationHistory = await getConversationHistory(supabase, clientId, msg.conversationId, 5);
+
+      const draft = await draftResponse({
+        intent: intent === 'opt_out' ? 'general_question' : intent,
+        intelligenceOutput: {
+          opportunityType: 'other',
+          qualificationScore: 0,
+          estimatedRevenue: 0,
+          recommendedStrategy: 'standard_followup',
+          riskFactors: [],
+          confidence: 1.0,
+          reasoning: 'Inbound customer message',
+        },
+        conversationContext: {
+          conversationId: msg.conversationId,
+          channel: msg.channel,
+          recentMessages: conversationHistory,
+        },
+        supabase,
+        clientId,
+        correlationId: msg.id,
+      });
+
+      const validation = validateDraftConstraints(draft);
+      if (!validation.valid) {
+        await supabase
+          .from('messages')
+          .update({ status: 'failed', updated_at: new Date().toISOString() })
+          .eq('id', msg.id)
+          .eq('client_id', clientId);
+        failed++;
+        continue;
+      }
+
+      const safetyResult = await evaluateSafety(supabase, {
+        clientId,
+        customerId: msg.customerId,
+        channel: (CHANNEL_MAP[msg.channel] || 'sms') as 'sms' | 'email' | 'phone_call',
+        actionType: 'inbound_response',
+        metadata: { intent, messageId: msg.id, messageContent: msg.content },
+      });
+
+      if (safetyResult.decision === 'BLOCK') {
+        await supabase
+          .from('messages')
+          .update({ status: 'failed', updated_at: new Date().toISOString() })
+          .eq('id', msg.id)
+          .eq('client_id', clientId);
+        failed++;
+        continue;
+      }
+
+      await supabase.from('actions').insert({
+        client_id: clientId,
+        customer_id: msg.customerId,
+        conversation_id: msg.conversationId,
+        worker_type: 'recovery',
+        action_type: 'draft_response',
+        risk_level: safetyResult.decision === 'ESCALATE' ? 'yellow' : 'green',
+        status: safetyResult.decision === 'ESCALATE' ? 'pending' : 'approved',
+        approval_required: safetyResult.decision === 'ESCALATE',
+        input: {
+          messageId: msg.id,
+          intent,
+          channel: msg.channel,
+          content: msg.content,
+        },
+        output: {
+          response: draft.response,
+          draftedResponse: draft.response,
+          tone: draft.tone,
+          safetyDecision: safetyResult.decision,
+          confidence: 1.0,
+        },
+        idempotency_key: `inbound:${msg.id}`,
+      });
+
+      await supabase
+        .from('messages')
+        .update({ status: 'processed', updated_at: new Date().toISOString() })
+        .eq('id', msg.id)
+        .eq('client_id', clientId);
+
+      succeeded++;
+    } catch {
+      await supabase
+        .from('messages')
+        .update({ status: 'failed', updated_at: new Date().toISOString() })
+        .eq('id', msg.id)
+        .eq('client_id', clientId);
+      failed++;
+    }
+  }
+
+  return { total: messages.length, succeeded, failed };
 }

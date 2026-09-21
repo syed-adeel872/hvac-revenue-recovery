@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { generateFollowupMessage } from '@/lib/gemini'
+import { generateFollowupMessage } from '@/lib/llm/client'
+import { timingSafeEqual } from 'crypto'
 
 const CRON_SECRET = process.env.CRON_SECRET
 
@@ -17,7 +18,13 @@ export async function POST(req: NextRequest) {
   }
 
   const token = authHeader.slice(7)
-  if (!CRON_SECRET || token !== CRON_SECRET) {
+  if (!CRON_SECRET || token.length !== CRON_SECRET.length) {
+    return NextResponse.json({ error: 'Invalid authorization token' }, { status: 401 })
+  }
+
+  const tokenBuffer = Buffer.from(token)
+  const secretBuffer = Buffer.from(CRON_SECRET)
+  if (!timingSafeEqual(tokenBuffer, secretBuffer)) {
     return NextResponse.json({ error: 'Invalid authorization token' }, { status: 401 })
   }
 

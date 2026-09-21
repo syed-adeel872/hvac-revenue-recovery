@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { evaluateSafety } from '@/lib/safety/evaluate-safety';
-import { checkConsentStatus, checkOptOutKeywords } from '@/lib/safety/consent-checker';
+import { checkConsentStatus, checkOptOutKeywords, checkOptOutStatus } from '@/lib/safety/consent-checker';
 import { loadClientPolicies } from '@/lib/safety/policy-engine';
 import { evaluateRateLimit } from '@/lib/safety/policy-engine';
 
 vi.mock('@/lib/safety/consent-checker', () => ({
   checkConsentStatus: vi.fn(),
   checkOptOutKeywords: vi.fn(),
+  checkOptOutStatus: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('@/lib/safety/policy-engine', async () => {

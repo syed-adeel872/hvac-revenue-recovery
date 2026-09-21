@@ -6,6 +6,7 @@ export interface GenericHMACConfig {
   eventTypeField: string;
   externalEventIdField: string;
   timestampField?: string;
+  algorithm?: 'hmac_sha256' | 'hmac_sha1';
 }
 
 export interface ExtractedEventInfo {
@@ -24,6 +25,7 @@ export class GenericHMACAdapter {
       eventTypeField: config.eventTypeField,
       externalEventIdField: config.externalEventIdField,
       timestampField: config.timestampField,
+      algorithm: config.algorithm || 'hmac_sha256',
     };
   }
 
@@ -33,7 +35,7 @@ export class GenericHMACAdapter {
     encryptedSecret: Uint8Array
   ): Promise<VerificationResult> {
     return verifySignature({
-      authType: 'hmac_sha256',
+      authType: this.config.algorithm || 'hmac_sha256',
       rawBody,
       headers,
       encryptedSecret,

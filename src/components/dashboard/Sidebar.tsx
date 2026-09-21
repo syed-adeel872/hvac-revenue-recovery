@@ -4,145 +4,176 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useDashboard } from "@/components/dashboard/DashboardContext";
+import {
+  LayoutDashboard,
+  Target,
+  GitBranch,
+  Shield,
+  ScrollText,
+  Plug,
+  Building2,
+  Zap,
+} from "lucide-react";
 
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  safetyBlocks?: number;
+  opportunities?: number;
 }
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: "dashboard" },
-  { name: "Customers", href: "/customers", icon: "customers" },
-  { name: "Campaigns", href: "/campaigns", icon: "campaigns" },
-  { name: "Analytics", href: "/analytics", icon: "analytics" },
-  { name: "Workflows", href: "/workflows", icon: "workflows" },
-  { name: "Settings", href: "/settings", icon: "settings" },
-];
+interface WorkerHealthItem {
+  k: string;
+  v: string;
+  status: "ok" | "degraded" | "idle";
+}
 
-const Icons = {
-  dashboard: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-    </svg>
-  ),
-  customers: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  ),
-  campaigns: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-    </svg>
-  ),
-  analytics: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-  ),
-  workflows: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-  ),
-  settings: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
-};
+function deriveWorkerHealth(workers: WorkerHealthItem[]): WorkerHealthItem[] {
+  return workers;
+}
 
-export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ isCollapsed, onToggle, safetyBlocks, opportunities }: SidebarProps) {
   const pathname = usePathname();
+  const { workflows } = useDashboard();
+
+  const pipelineStages = workflows?.pipelineStages ?? [];
+
+  const workerHealth: WorkerHealthItem[] = [
+    {
+      k: "Intelligence",
+      v: pipelineStages.find((s) => s.workerType === "intelligence")?.health === "degraded" ? "WARN" : "OK",
+      status: pipelineStages.find((s) => s.workerType === "intelligence")?.health === "degraded" ? "degraded" : "ok",
+    },
+    {
+      k: "Recovery",
+      v: pipelineStages.find((s) => s.workerType === "recovery")?.health === "degraded" ? "WARN" : "OK",
+      status: pipelineStages.find((s) => s.workerType === "recovery")?.health === "degraded" ? "degraded" : "ok",
+    },
+    {
+      k: "Safety",
+      v: pipelineStages.find((s) => s.workerType === "safety")?.health === "degraded" ? "WARN" : "OK",
+      status: pipelineStages.find((s) => s.workerType === "safety")?.health === "degraded" ? "degraded" : "ok",
+    },
+    {
+      k: "Ops",
+      v: pipelineStages.length === 0 ? "IDLE" : "OK",
+      status: pipelineStages.length === 0 ? "idle" : "ok",
+    },
+  ];
+
+  const navigation = [
+    { label: "Dashboard", href: "/", icon: LayoutDashboard, badge: null },
+    { label: "Opportunities", href: "/opportunities", icon: Target, badge: opportunities != null ? String(opportunities) : null },
+    { label: "Recovery Pipeline", href: "/recovery-pipeline", icon: GitBranch, badge: null },
+    { label: "Safety", href: "/safety", icon: Shield, badge: safetyBlocks != null ? String(safetyBlocks) : null },
+    { label: "Operations", href: "/operations", icon: ScrollText, badge: null },
+    { label: "Integrations", href: "/integrations", icon: Plug, badge: null },
+    { label: "Tenants & Settings", href: "/tenants", icon: Building2, badge: null },
+  ];
 
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-slate-950 border-r border-slate-800/50 flex flex-col transition-all duration-300",
-        isCollapsed ? "w-20" : "w-72"
+        "fixed left-0 top-0 z-40 h-screen flex flex-col transition-all duration-300",
+        "bg-[#0A0E14] border-r border-[#1E293B]",
+        isCollapsed ? "w-[68px]" : "w-[260px]"
       )}
     >
-      <div className={cn("p-5 border-b border-slate-800/50 flex items-center justify-between", isCollapsed && "justify-center")}>
-        {!isCollapsed && (
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-950 animate-pulse" />
+      {/* Logo */}
+      <div className={cn("h-16 flex items-center border-b border-[#1E293B] px-4", isCollapsed && "justify-center")}>
+        {!isCollapsed ? (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[#3B82F6] flex items-center justify-center">
+              <Zap className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">HVAC Recovery</h1>
-              <p className="text-xs text-slate-500 mt-0.5">Revenue Intelligence</p>
+              <div className="text-sm font-semibold text-white tracking-[-0.01em]">HVAC Recovery</div>
+              <div className="text-[10px] text-slate-500">Revenue Intelligence</div>
             </div>
+          </div>
+        ) : (
+          <div className="w-9 h-9 rounded-lg bg-[#3B82F6] flex items-center justify-center">
+            <Zap className="w-5 h-5 text-white" />
           </div>
         )}
         <button
           onClick={onToggle}
-          className={cn(
-            "p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors",
-            isCollapsed && "ml-auto"
-          )}
+          className={cn("p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#141A25] transition-colors", isCollapsed ? "ml-auto" : "ml-auto")}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d={isCollapsed ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"} />
           </svg>
         </button>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
         {navigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-          const Icon = Icons[item.icon as keyof typeof Icons];
-          
+          const Icon = item.icon;
+
           return (
             <Link
-              key={item.name}
+              key={item.label}
               href={item.href}
               className={cn(
-                "relative flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
+                "group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all",
                 isActive
-                  ? "bg-gradient-to-r from-emerald-500/15 to-emerald-700/10 text-emerald-300 border border-emerald-500/20 shadow-lg shadow-emerald-500/5"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50",
+                  ? "bg-[#141A25] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_0_0_1px_rgba(59,130,246,0.2)]"
+                  : "text-slate-400 hover:bg-[#141A25]/60 hover:text-slate-200",
                 isCollapsed && "justify-center"
               )}
               aria-current={isActive ? "page" : undefined}
-              title={isCollapsed ? item.name : undefined}
+              title={isCollapsed ? item.label : undefined}
             >
-              <span className={cn("flex-shrink-0", isActive && "text-emerald-400")}>{Icon}</span>
-              {!isCollapsed && <span className="truncate">{item.name}</span>}
-              {isActive && !isCollapsed && (
-                <span className="ml-auto w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+              <Icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-[#3B82F6]" : "text-slate-500 group-hover:text-slate-300")} />
+              {!isCollapsed && (
+                <>
+                  <span className="flex-1 text-left tracking-[-0.01em]">{item.label}</span>
+                  {item.badge && (
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      item.label.includes("Safety")
+                        ? "bg-[#EF4444]/15 text-[#EF4444] border border-[#EF4444]/20"
+                        : "bg-[#1E293B] text-slate-300"
+                    )}>
+                      {item.badge}
+                    </span>
+                  )}
+                </>
               )}
             </Link>
           );
         })}
       </nav>
 
-      <div className={cn("p-4 border-t border-slate-800/50", isCollapsed && "hidden")}>
-        <div className="bg-gradient-to-br from-slate-900/50 to-slate-800/30 border border-slate-800/50 rounded-xl p-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">AI Engine Active</p>
-              <p className="text-xs text-slate-500">12 workflows running</p>
-            </div>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
+      {/* Worker Health */}
+      {!isCollapsed && (
+        <div className="border-t border-[#1E293B] p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2 px-1">Worker Health</div>
+          <div className="grid grid-cols-2 gap-2">
+            {workerHealth.map((w) => (
+              <div key={w.k} className="flex items-center gap-2 rounded-lg bg-[#141A25] px-2.5 py-2 border border-[#1E293B]">
+                <span className={cn(
+                  "h-1.5 w-1.5 rounded-full",
+                  w.status === "degraded" ? "bg-[#F59E0B] animate-pulse" :
+                  w.status === "idle" ? "bg-slate-600" :
+                  "bg-[#10B981]"
+                )} />
+                <span className="text-[11px] text-slate-300">{w.k}</span>
+                <span className={cn(
+                  "ml-auto text-[10px] font-semibold",
+                  w.status === "degraded" ? "text-[#F59E0B]" :
+                  w.status === "idle" ? "text-slate-500" :
+                  "text-[#10B981]"
+                )}>{w.v}</span>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

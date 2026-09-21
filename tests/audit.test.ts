@@ -17,11 +17,15 @@ describe('Audit Foundations', () => {
     expect(allContent).toMatch(/actor_id uuid/i);
     expect(allContent).toMatch(/action text NOT NULL/i);
     expect(allContent).toMatch(/resource_type text NOT NULL/i);
-    expect(allContent).toMatch(/resource_id uuid NOT NULL/i);
+    expect(allContent).toMatch(/resource_id uuid/i);
     expect(allContent).toMatch(/old_values jsonb/i);
     expect(allContent).toMatch(/new_values jsonb/i);
     expect(allContent).toMatch(/metadata jsonb/i);
     expect(allContent).toMatch(/created_at timestamptz NOT NULL DEFAULT now\(\)/i);
+  });
+
+  it('should allow audit_logs.resource_id to be nullable for system events', () => {
+    expect(allContent).toMatch(/ALTER TABLE audit_logs ALTER COLUMN resource_id DROP NOT NULL/i);
   });
 
   it('should have audit_logs append-only (no UPDATE/DELETE policies)', () => {
@@ -95,5 +99,39 @@ describe('Audit Foundations', () => {
     expect(allContent).toMatch(/system_audit_logs_select_tenant_admin/i);
     expect(allContent).toMatch(/client_id IS NULL[\s\S]*owner[\s\S]*admin/i);
     expect(allContent).toMatch(/client_id IS NOT NULL[\s\S]*get_current_tenant_id\(\)/i);
+  });
+
+  it('should have WORM trigger on audit_logs (BEFORE UPDATE OR DELETE)', () => {
+    expect(allContent).toMatch(/CREATE TRIGGER audit_logs_worm_trigger/i);
+    expect(allContent).toMatch(/BEFORE UPDATE OR DELETE ON audit_logs/i);
+    expect(allContent).toMatch(/EXECUTE FUNCTION prevent_audit_log_mutation\(\)/i);
+  });
+
+  it('should have WORM trigger on system_audit_logs (BEFORE UPDATE OR DELETE)', () => {
+    expect(allContent).toMatch(/CREATE TRIGGER system_audit_logs_worm_trigger/i);
+    expect(allContent).toMatch(/BEFORE UPDATE OR DELETE ON system_audit_logs/i);
+    expect(allContent).toMatch(/EXECUTE FUNCTION prevent_system_audit_log_mutation\(\)/i);
+  });
+
+  it('should have WORM trigger functions with SECURITY DEFINER', () => {
+    expect(allContent).toMatch(/CREATE OR REPLACE FUNCTION prevent_audit_log_mutation/i);
+    expect(allContent).toMatch(/CREATE OR REPLACE FUNCTION prevent_system_audit_log_mutation/i);
+    expect(allContent).toMatch(/prevent_audit_log_mutation[\s\S]*SECURITY DEFINER/i);
+    expect(allContent).toMatch(/prevent_system_audit_log_mutation[\s\S]*SECURITY DEFINER/i);
+  });
+
+  it('should raise exceptions for UPDATE/DELETE on audit_logs', () => {
+    expect(allContent).toMatch(/prevent_audit_log_mutation[\s\S]*RAISE EXCEPTION.*append-only/i);
+    expect(allContent).toMatch(/prevent_system_audit_log_mutation[\s\S]*RAISE EXCEPTION.*append-only/i);
+  });
+
+  it('should REVOKE UPDATE and DELETE on audit tables from service_role', () => {
+    expect(allContent).toMatch(/REVOKE UPDATE, DELETE ON audit_logs FROM service_role/i);
+    expect(allContent).toMatch(/REVOKE UPDATE, DELETE ON system_audit_logs FROM service_role/i);
+  });
+
+  it('should REVOKE UPDATE and DELETE on audit tables from authenticated', () => {
+    expect(allContent).toMatch(/REVOKE UPDATE, DELETE ON audit_logs FROM authenticated/i);
+    expect(allContent).toMatch(/REVOKE UPDATE, DELETE ON system_audit_logs FROM authenticated/i);
   });
 });

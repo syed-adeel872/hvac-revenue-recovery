@@ -8,7 +8,9 @@ function makeThenableChain(data: any, error: any = null) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({ data, error }),
+    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
   };
   chain.then = (resolve: any, reject?: any) => {
     try {
@@ -24,16 +26,28 @@ function makeThenableChain(data: any, error: any = null) {
 function createMockSupabase(options?: { conversation?: any; messageInsert?: any }) {
   const conversation = options?.conversation ?? { customer_id: 'cust-1' };
   const messageInsert = options?.messageInsert ?? { id: 'msg-1' };
+  let consentCallCount = 0;
 
-  let callCount = 0;
   return {
     from: vi.fn((table: string) => {
-      callCount++;
       if (table === 'conversations') {
         return makeThenableChain(conversation);
       }
       if (table === 'messages') {
         return makeThenableChain(messageInsert);
+      }
+      if (table === 'system_config') {
+        return makeThenableChain(null);
+      }
+      if (table === 'clients') {
+        return makeThenableChain({ kill_switch_enabled: false });
+      }
+      if (table === 'consents') {
+        consentCallCount++;
+        if (consentCallCount === 1) {
+          return makeThenableChain({ status: 'granted', expires_at: null, granted_at: new Date().toISOString(), revoked_at: null });
+        }
+        return makeThenableChain(null);
       }
       return makeThenableChain(null);
     }),

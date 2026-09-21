@@ -31,7 +31,7 @@ export interface ClaimedRecoveryAction {
 }
 
 export interface DispatchParams {
-  channel: 'sms' | 'email';
+  channel: 'sms' | 'email' | 'phone_call';
   to: string;
   content: string;
   clientId: string;
@@ -75,7 +75,5 @@ export interface ProcessBatchResult {
 }
 
 export interface ExecutionOptions {
-  skipRateLimit?: boolean;
-  skipCircuitBreaker?: boolean;
   rateLimitOptions?: { hourly?: number; daily?: number };
 }

@@ -69,9 +69,7 @@ export async function claimIntelligenceActions(
     }));
 }
 
-export async function claimInboundMessages(
-  options: ClaimActionsOptions & { conversationId?: string }
-): Promise<Array<{
+export interface ClaimedInboundMessage {
   id: string;
   clientId: string;
   customerId: string;
@@ -79,7 +77,11 @@ export async function claimInboundMessages(
   content: string;
   channel: string;
   receivedAt: string;
-}>> {
+}
+
+export async function claimInboundMessages(
+  options: ClaimActionsOptions & { conversationId?: string }
+): Promise<ClaimedInboundMessage[]> {
   const { supabase, clientId, batchSize = 10, conversationId } = options;
 
   let query = supabase
@@ -103,6 +105,18 @@ export async function claimInboundMessages(
 
   if (!messages || messages.length === 0) {
     return [];
+  }
+
+  const messageIds = messages.map((m: any) => m.id);
+
+  const { error: updateError } = await supabase
+    .from('messages')
+    .update({ status: 'processing', updated_at: new Date().toISOString() })
+    .in('id', messageIds)
+    .eq('status', 'received');
+
+  if (updateError) {
+    throw new Error(`Failed to mark messages as processing: ${updateError.message}`);
   }
 
   return messages.map((m: any) => ({

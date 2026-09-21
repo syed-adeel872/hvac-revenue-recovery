@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { createAdminClient } from '@/lib/supabase/server';
 import { runPipeline, runMultiTenantPipeline } from '@/lib/pipeline/orchestrator';
 import { z } from 'zod';
+import { checkHttpRateLimit } from '@/lib/safety/resilience/http-rate-limiter';
 
 const VALID_BATCH_SIZES = [5, 10, 25, 50];
-const CRON_SECRET = process.env.CRON_SECRET;
+const VALID_STAGES = ['ingestion', 'inbound', 'intelligence', 'recovery', 'execution', 'operations'];
 
 const multiTenantSchema = z.object({
   clientIds: z.array(z.string().uuid()).min(1).max(50),
@@ -14,14 +16,29 @@ const singleTenantSchema = z.object({
   clientId: z.string().uuid(),
 });
 
+function verifyCronToken(token: string): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  if (token.length !== secret.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+}
+
 export async function POST(request: NextRequest) {
+  const rl = checkHttpRateLimit('run-pipeline', { windowMs: 60000, maxRequests: 10 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, {
+      status: 429,
+      headers: { 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) },
+    });
+  }
+
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
   }
 
   const token = authHeader.slice(7);
-  if (!CRON_SECRET || token !== CRON_SECRET) {
+  if (!verifyCronToken(token)) {
     return NextResponse.json({ error: 'Invalid authorization token' }, { status: 401 });
   }
 
@@ -52,8 +69,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = await createAdminClient();
-    const skipStages = Array.isArray(body.skipStages) ? body.skipStages as string[] : [];
+    const supabase = createAdminClient();
+    const rawSkipStages = Array.isArray(body.skipStages) ? body.skipStages as string[] : [];
+    const skipStages = rawSkipStages.filter((s) => VALID_STAGES.includes(s));
 
     if (body.clientIds && Array.isArray(body.clientIds) && body.clientIds.length > 0) {
       const parsed = multiTenantSchema.safeParse({ clientIds: body.clientIds });
@@ -112,8 +130,7 @@ export async function POST(request: NextRequest) {
       { error: 'Provide clientId (string) or clientIds (string[]) in request body' },
       { status: 400 },
     );
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Pipeline failed';
-    return NextResponse.json({ error: msg }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Pipeline execution failed' }, { status: 500 });
   }
 }

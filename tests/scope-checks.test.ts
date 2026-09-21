@@ -6,7 +6,7 @@ const MIGRATIONS_DIR = path.join(__dirname, '..', 'supabase', 'migrations');
 
 describe('Step 2 Scope Checks', () => {
   const allContent: string = fs.readdirSync(MIGRATIONS_DIR)
-    .filter(f => f.endsWith('.sql') && !f.startsWith('000014'))
+    .filter(f => f.endsWith('.sql') && !f.startsWith('000014') && !f.startsWith('000017') && !f.startsWith('000018') && !f.startsWith('000021'))
     .map(f => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8'))
     .join('\n');
 

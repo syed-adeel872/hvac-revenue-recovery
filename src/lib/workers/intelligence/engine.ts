@@ -1,4 +1,5 @@
 import { callLLM } from '@/lib/llm/client';
+import { recordLLMUsage } from '@/lib/cost-tracking';
 import { sanitizePayload, extractCustomerContext } from './sanitize';
 import { SYSTEM_PROMPT, buildAnalysisPrompt, AnalysisPromptData } from './prompts';
 import { claimEvents, markEventProcessed } from './claim-events';
@@ -41,12 +42,27 @@ export async function processEvent(options: ProcessEventOptions): Promise<Intell
 
     const userPrompt = buildAnalysisPrompt(promptData);
 
-    const { data: output } = await callLLM({
+    const { data: output, usage } = await callLLM({
       systemPrompt: SYSTEM_PROMPT,
       userPrompt,
       responseSchema: IntelligenceOutputSchema,
       temperature: 0.3,
       maxTokens: 1024,
+      onUsage: (u) => {
+        recordLLMUsage({
+          supabase,
+          clientId: event.clientId,
+          provider: 'openai',
+          model: process.env.LLM_MODEL || 'unknown',
+          endpoint: 'chat.completions',
+          promptTokens: u.promptTokens,
+          completionTokens: u.completionTokens,
+          totalTokens: u.totalTokens,
+          responseTimeMs: 0,
+          statusCode: 200,
+          correlationId: event.id,
+        });
+      },
     });
 
     const strategyAdjustedOutput = adjustStrategy(output, daysSinceSent);

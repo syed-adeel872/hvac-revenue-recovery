@@ -3,14 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 17, 24, 39;
-  --background-end-rgb: 17, 24, 39;
+  --bg-darkest: #0A0E14;
+  --bg-card: #141A25;
+  --bg-elevated: #1E293B;
+  --accent-blue: #3B82F6;
+  --accent-green: #10B981;
+  --accent-red: #EF4444;
+  --accent-amber: #F59E0B;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-start-rgb));
+  color: #fff;
+  background: #0A0E14;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -18,43 +23,38 @@ body {
 }
 
 ::selection {
-  background-color: #10b981;
+  background-color: #3B82F6;
   color: white;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #0A0E14;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+  background: #1E293B;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #334155;
 }
 
 /* Focus styles */
 *:focus-visible {
-  outline: 2px solid #10b981;
+  outline: 2px solid #3B82F6;
   outline-offset: 2px;
 }
 
-/* Smooth transitions */
-* {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-/* Glowing card hover effects */
-.glow-card:hover {
-  box-shadow: 0 25px 50px -12px rgba(16, 185, 129, 0.15);
+/* Mono font utility */
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 /* Animations */

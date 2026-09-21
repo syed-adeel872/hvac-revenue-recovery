@@ -119,6 +119,11 @@ export class TwilioMessagingAdapter {
     hmac.update(data);
     const computedSignature = hmac.digest('base64');
 
-    return computedSignature === signature;
+    if (computedSignature.length !== signature.length) {
+      return false;
+    }
+
+    const { timingSafeEqual } = require('crypto');
+    return timingSafeEqual(Buffer.from(computedSignature), Buffer.from(signature));
   }
 }

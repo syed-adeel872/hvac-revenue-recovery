@@ -7,6 +7,7 @@ import { validateTimestamp, createReplayConfig } from '@/lib/webhook/replay';
 import { persistIngestionEvent, logProcessingStage } from '@/lib/webhook/persistence';
 import { createAdapter } from '@/lib/webhook/adapters';
 import { mapErrorToResponse, WebhookErrorCode, createError } from '@/lib/webhook/errors';
+import { checkHttpRateLimit } from '@/lib/safety/resilience/http-rate-limiter';
 
 const MAX_PAYLOAD_SIZE = 1024 * 1024;
 
@@ -19,8 +20,17 @@ export async function POST(
   let providerConfig: any;
   let ingestionEventId: string | undefined;
 
+  const ip = request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? 'unknown';
+  const rl = checkHttpRateLimit(`webhook:${ip}`, { windowMs: 60000, maxRequests: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, {
+      status: 429,
+      headers: { 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) },
+    });
+  }
+
   try {
-    supabase = await createAdminClient();
+    supabase = createAdminClient();
 
     const { provider_name } = await params;
     const providerName = provider_name;

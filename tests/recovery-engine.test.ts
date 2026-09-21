@@ -68,6 +68,7 @@ function createMockSupabase() {
 
   return {
     from: vi.fn(() => mockChain),
+    rpc: vi.fn().mockResolvedValue({ error: null }),
     _mockChain: mockChain,
   };
 }

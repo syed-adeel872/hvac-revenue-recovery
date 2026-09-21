@@ -1,6 +1,8 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { ClaimedRecoveryAction, DispatchResult } from './types';
 import { MessagingAdapter } from './adapters';
+import { checkKillSwitch } from '@/lib/safety/resilience/kill-switch';
+import { checkConsentStatus, checkOptOutStatus } from '@/lib/safety/consent-checker';
 
 interface DraftOutput {
   response: string;
@@ -34,8 +36,9 @@ export async function dispatchMessage(
     return { success: false, error: 'No conversation ID associated with action' };
   }
 
-  const channel = (input?.channel ?? 'sms') as 'sms' | 'email';
-  const to = channel === 'sms' ? (input?.customerPhone ?? '') : (input?.customerEmail ?? '');
+  const channel = (input?.channel ?? 'sms') as 'sms' | 'email' | 'phone_call';
+  const to = channel === 'sms' || channel === 'phone_call' ? (input?.customerPhone ?? '') : (input?.customerEmail ?? '');
+  const traceId = (action.metadata as Record<string, unknown>)?.trace_id as string | undefined ?? action.id;
 
   if (!to) {
     return { success: false, error: `No ${channel} address available for customer` };
@@ -50,6 +53,21 @@ export async function dispatchMessage(
 
   if (convError || !conversation) {
     return { success: false, error: 'Failed to load conversation context' };
+  }
+
+  const ks = await checkKillSwitch(supabase, action.clientId);
+  if (ks.enabled) {
+    return { success: false, error: `Kill switch active: ${ks.reason}` };
+  }
+
+  const consent = await checkConsentStatus(supabase, action.clientId, conversation.customer_id, channel);
+  if (!consent || consent.status === 'revoked' || consent.status === 'unknown') {
+    return { success: false, error: 'Consent not verified or customer opted out' };
+  }
+
+  const optedOut = await checkOptOutStatus(supabase, action.clientId, conversation.customer_id);
+  if (optedOut) {
+    return { success: false, error: 'Customer has opted out' };
   }
 
   const deliveryResult = await adapter.send({
@@ -72,7 +90,7 @@ export async function dispatchMessage(
       status: 'failed',
       error_code: deliveryResult.errorCode ?? 'UNKNOWN',
       error_message: deliveryResult.error ?? 'Unknown error',
-      metadata: JSON.stringify({ actionId: action.id }),
+      metadata: JSON.stringify({ actionId: action.id, traceId }),
     });
 
     if (msgError) {
@@ -97,7 +115,7 @@ export async function dispatchMessage(
       status: 'sent',
       external_message_id: deliveryResult.externalId ?? null,
       sent_at: new Date().toISOString(),
-      metadata: JSON.stringify({ actionId: action.id }),
+      metadata: JSON.stringify({ actionId: action.id, traceId }),
     })
     .select('id')
     .single();

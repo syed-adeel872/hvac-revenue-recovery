@@ -30,6 +30,8 @@ const EXPECTED_MIGRATIONS = [
   '000014_kill_switch.sql',
   '000015_hardening_fixes.sql',
   '000016_production_hardening.sql',
+  '000017_consistency_fixes.sql',
+  '000018_message_status_expansion.sql',
 ];
 
 function createClient() {

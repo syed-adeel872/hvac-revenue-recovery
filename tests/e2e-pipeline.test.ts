@@ -12,6 +12,7 @@ vi.mock('@/lib/workers/intelligence/engine', () => ({
 
 vi.mock('@/lib/workers/recovery/engine', () => ({
   processBatch: vi.fn(),
+  processInboundMessages: vi.fn(),
 }));
 
 vi.mock('@/lib/workers/execution/engine', () => ({
@@ -30,7 +31,7 @@ vi.mock('@/lib/safety/resilience/kill-switch', () => ({
 
 import { processBatchOnce } from '@/lib/webhook/processor';
 import { processBatch as processIntelligenceBatch } from '@/lib/workers/intelligence/engine';
-import { processBatch as processRecoveryBatch } from '@/lib/workers/recovery/engine';
+import { processBatch as processRecoveryBatch, processInboundMessages } from '@/lib/workers/recovery/engine';
 import { processBatch as processExecutionBatch } from '@/lib/workers/execution/engine';
 import { processBatch as processOperationsBatch } from '@/lib/workers/operations/engine';
 import { checkKillSwitch, checkGlobalKillSwitch } from '@/lib/safety/resilience/kill-switch';
@@ -51,6 +52,7 @@ describe('runPipeline', () => {
     (checkKillSwitch as any).mockResolvedValue({ enabled: false });
     (checkGlobalKillSwitch as any).mockResolvedValue({ enabled: false });
     (processBatchOnce as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, retried: 0 });
+    (processInboundMessages as any).mockResolvedValue({ total: 0, succeeded: 0, failed: 0 });
     (processIntelligenceBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processRecoveryBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processExecutionBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, rejected: 0, held: 0, results: [] });
@@ -66,9 +68,9 @@ describe('runPipeline', () => {
 
     expect(result.success).toBe(true);
     expect(result.clientId).toBe('client-1');
-    expect(result.stages).toHaveLength(5);
+    expect(result.stages).toHaveLength(6);
     expect(result.stages.map((s) => s.stage)).toEqual([
-      'ingestion', 'intelligence', 'recovery', 'execution', 'operations',
+      'ingestion', 'inbound', 'intelligence', 'recovery', 'execution', 'operations',
     ]);
     expect(result.stages.every((s) => s.success)).toBe(true);
     expect(processBatchOnce).toHaveBeenCalledWith(expect.objectContaining({ supabase: mockSupabase }));
@@ -207,6 +209,7 @@ describe('runMultiTenantPipeline', () => {
     (checkKillSwitch as any).mockResolvedValue({ enabled: false });
     (checkGlobalKillSwitch as any).mockResolvedValue({ enabled: false });
     (processBatchOnce as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, retried: 0 });
+    (processInboundMessages as any).mockResolvedValue({ total: 0, succeeded: 0, failed: 0 });
     (processIntelligenceBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processRecoveryBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processExecutionBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, rejected: 0, held: 0, results: [] });
@@ -254,7 +257,7 @@ describe('runMultiTenantPipeline', () => {
       adapter,
     });
 
-    expect(results[0].stages).toHaveLength(5);
+    expect(results[0].stages).toHaveLength(6);
     expect(results[0].stages.every((s) => s.stage !== undefined)).toBe(true);
   });
 });
@@ -271,6 +274,7 @@ describe('multi-tenant isolation verification', () => {
     (checkKillSwitch as any).mockResolvedValue({ enabled: false });
     (checkGlobalKillSwitch as any).mockResolvedValue({ enabled: false });
     (processBatchOnce as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, retried: 0 });
+    (processInboundMessages as any).mockResolvedValue({ total: 0, succeeded: 0, failed: 0 });
     (processIntelligenceBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processRecoveryBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, results: [] });
     (processExecutionBatch as any).mockResolvedValue({ total: 1, succeeded: 1, failed: 0, rejected: 0, held: 0, results: [] });

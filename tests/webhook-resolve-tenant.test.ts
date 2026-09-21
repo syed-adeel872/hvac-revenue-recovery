@@ -147,5 +147,25 @@ describe('resolve-tenant', () => {
     it('passes when header client_id matches resolved', () => {
       expect(() => validateTenantConsistency('client_456', undefined, { 'x-client-id': 'client_456' })).not.toThrow();
     });
+
+    it('malicious x-client-id header cannot select a different tenant', () => {
+      // The resolved tenant is ALWAYS from the provider config (trusted).
+      // A malicious x-client-id header can only cause REJECTION (if it doesn't match),
+      // never SELECTION of a different tenant.
+      const resolvedClientId = 'trusted_client_123';
+      const maliciousClientId = 'evil_client_999';
+
+      // Without header: passes (tenant is from provider config)
+      expect(() => validateTenantConsistency(resolvedClientId)).not.toThrow();
+
+      // With matching header: passes
+      expect(() => validateTenantConsistency(resolvedClientId, undefined, { 'x-client-id': resolvedClientId })).not.toThrow();
+
+      // With malicious header: REJECTS (does not switch to evil_client)
+      expect(() => validateTenantConsistency(resolvedClientId, undefined, { 'x-client-id': maliciousClientId })).toThrow();
+
+      // Verify the resolved client is never changed by the header
+      // The function only validates; it does not return or modify the resolved client
+    });
   });
 });

@@ -18,13 +18,18 @@ vi.mock('@/lib/safety/evaluate-safety', () => ({
   evaluateSafety: vi.fn(),
 }));
 
+const mockCBCanExecute = vi.fn().mockResolvedValue(true);
+const mockCBRecordSuccess = vi.fn().mockResolvedValue(undefined);
+const mockCBRecordFailure = vi.fn().mockResolvedValue(undefined);
+const mockCBGetState = vi.fn().mockResolvedValue({ state: 'CLOSED', failureCount: 0, lastFailureTime: null });
+
 vi.mock('@/lib/safety/resilience/persistent-circuit-breaker', () => {
   return {
     PersistentCircuitBreaker: class MockPersistentCircuitBreaker {
-      canExecute = vi.fn().mockResolvedValue(true);
-      recordSuccess = vi.fn().mockResolvedValue(undefined);
-      recordFailure = vi.fn().mockResolvedValue(undefined);
-      getState = vi.fn().mockResolvedValue({ state: 'CLOSED', failureCount: 0, lastFailureTime: null });
+      canExecute = mockCBCanExecute;
+      recordSuccess = mockCBRecordSuccess;
+      recordFailure = mockCBRecordFailure;
+      getState = mockCBGetState;
       reset = vi.fn().mockResolvedValue(undefined);
     },
   };
@@ -62,6 +67,7 @@ function makeChain(data: any, error: any = null) {
 function createMockSupabase() {
   return {
     from: vi.fn((table: string) => makeChain({ id: 'action-1' })),
+    rpc: vi.fn().mockResolvedValue({ error: null }),
   };
 }
 
@@ -104,6 +110,11 @@ describe('processRecoveryAction', () => {
     vi.clearAllMocks();
     mockSupabase = createMockSupabase();
     adapter = new MockMessagingAdapter();
+
+    mockCBCanExecute.mockReset().mockResolvedValue(true);
+    mockCBRecordSuccess.mockReset().mockResolvedValue(undefined);
+    mockCBRecordFailure.mockReset().mockResolvedValue(undefined);
+    mockCBGetState.mockReset().mockResolvedValue({ state: 'CLOSED', failureCount: 0, lastFailureTime: null });
 
     (checkKillSwitch as any).mockResolvedValue({ enabled: false });
     (checkRateLimit as any).mockResolvedValue({ allowed: true, current: 0, limit: 5, window: 'hourly' });
@@ -170,14 +181,6 @@ describe('processRecoveryAction', () => {
     expect(result.error).toContain('Rate limit');
   });
 
-  it('skips rate limit when option set', async () => {
-    (checkRateLimit as any).mockResolvedValue({ allowed: false });
-    const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter, {
-      skipRateLimit: true,
-    });
-    expect(result.rateLimit).toBeUndefined();
-  });
-
   it('fails when dispatch fails', async () => {
     (dispatchMessage as any).mockResolvedValue({
       success: false,
@@ -204,6 +207,39 @@ describe('processRecoveryAction', () => {
     const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter);
     expect(result.rateLimit).toBeDefined();
     expect(result.rateLimit?.allowed).toBe(true);
+  });
+
+  it('fails when circuit breaker blocks execution', async () => {
+    mockCBCanExecute.mockImplementationOnce(() => Promise.resolve(false));
+    mockCBGetState.mockImplementationOnce(() => Promise.resolve({ state: 'OPEN', failureCount: 5, lastFailureTime: Date.now() }));
+    const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter);
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('Circuit breaker');
+    expect(result.circuitBreaker).toBeDefined();
+    expect(result.circuitBreaker?.state).toBe('OPEN');
+  });
+
+  it('records circuit breaker success on successful dispatch', async () => {
+    const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter);
+    expect(result.status).toBe('completed');
+    expect(mockCBRecordSuccess).toHaveBeenCalled();
+  });
+
+  it('records circuit breaker failure on dispatch failure', async () => {
+    (dispatchMessage as any).mockResolvedValue({ success: false, error: 'Provider down' });
+    const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter);
+    expect(result.status).toBe('failed');
+    expect(mockCBRecordFailure).toHaveBeenCalled();
+  });
+
+  it('returns circuit breaker snapshot when blocked', async () => {
+    mockCBCanExecute.mockImplementationOnce(() => Promise.resolve(false));
+    mockCBGetState.mockImplementationOnce(() => Promise.resolve({ state: 'OPEN', failureCount: 8, lastFailureTime: Date.now() }));
+    const result = await processRecoveryAction(mockSupabase as any, createMockAction(), adapter);
+    expect(result.status).toBe('failed');
+    expect(result.circuitBreaker).toBeDefined();
+    expect(result.circuitBreaker?.state).toBe('OPEN');
+    expect(result.circuitBreaker?.failureCount).toBe(8);
   });
 });
 
@@ -281,25 +317,36 @@ describe('processBatch', () => {
 });
 
 describe('markActionCompleted', () => {
-  it('updates action status to completed', async () => {
+  it('transitions action status to completed via RPC', async () => {
     const mockSupabase = createMockSupabase();
     await markActionCompleted(mockSupabase as any, 'action-1', 'client-1');
-    expect(mockSupabase.from).toHaveBeenCalledWith('actions');
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('transition_action_status', expect.objectContaining({
+      p_action_id: 'action-1',
+      p_new_status: 'completed',
+    }));
   });
 });
 
 describe('markActionFailed', () => {
-  it('updates action status to failed with error message', async () => {
+  it('transitions action status to failed via RPC', async () => {
     const mockSupabase = createMockSupabase();
     await markActionFailed(mockSupabase as any, 'action-1', 'client-1', 'test error');
-    expect(mockSupabase.from).toHaveBeenCalledWith('actions');
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('transition_action_status', expect.objectContaining({
+      p_action_id: 'action-1',
+      p_new_status: 'failed',
+      p_error_message: 'test error',
+    }));
   });
 });
 
 describe('markActionRejected', () => {
-  it('updates action status to rejected with reason', async () => {
+  it('transitions action status to rejected via RPC', async () => {
     const mockSupabase = createMockSupabase();
     await markActionRejected(mockSupabase as any, 'action-1', 'client-1', 'consent revoked');
-    expect(mockSupabase.from).toHaveBeenCalledWith('actions');
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('transition_action_status', expect.objectContaining({
+      p_action_id: 'action-1',
+      p_new_status: 'rejected',
+      p_error_message: 'consent revoked',
+    }));
   });
 });

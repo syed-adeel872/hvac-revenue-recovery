@@ -66,7 +66,7 @@ describe('POST /api/v1/jobs/process-webhooks', () => {
     const { createAdminClient } = await import('@/lib/supabase/server');
     const { processBatchOnce } = await import('@/lib/webhook/processor');
 
-    (createAdminClient as any).mockResolvedValue(mockSupabase);
+    (createAdminClient as any).mockReturnValue(mockSupabase);
     (processBatchOnce as any).mockResolvedValue({
       total: 5,
       succeeded: 4,
@@ -90,7 +90,7 @@ describe('POST /api/v1/jobs/process-webhooks', () => {
     const { createAdminClient } = await import('@/lib/supabase/server');
     const { processBatchOnce } = await import('@/lib/webhook/processor');
 
-    (createAdminClient as any).mockResolvedValue(mockSupabase);
+    (createAdminClient as any).mockReturnValue(mockSupabase);
     (processBatchOnce as any).mockResolvedValue({
       total: 0,
       succeeded: 0,
@@ -120,7 +120,7 @@ describe('POST /api/v1/jobs/process-webhooks', () => {
     const { createAdminClient } = await import('@/lib/supabase/server');
     const { processBatchOnce } = await import('@/lib/webhook/processor');
 
-    (createAdminClient as any).mockResolvedValue(mockSupabase);
+    (createAdminClient as any).mockReturnValue(mockSupabase);
     (processBatchOnce as any).mockRejectedValue(new Error('DB connection failed'));
 
     const request = createRequest({ authorization: 'Bearer test-secret-123' });

@@ -14,8 +14,8 @@ describe('Migration Structure', () => {
     migrationFiles.push(...files);
   });
 
-  it('should have exactly 16 migration files', () => {
-    expect(migrationFiles.length).toBe(16);
+  it('should have exactly 22 migration files', () => {
+    expect(migrationFiles.length).toBe(22);
   });
 
   it('should have sequential migration numbering', () => {
@@ -36,6 +36,12 @@ describe('Migration Structure', () => {
       '000014_',
       '000015_',
       '000016_',
+      '000017_',
+      '000018_',
+      '000019_',
+      '000020_',
+      '000021_',
+      '000022_',
     ];
 
     expectedPrefixes.forEach((prefix, i) => {
@@ -61,6 +67,12 @@ describe('Migration Structure', () => {
       '000014_kill_switch.sql',
       '000015_hardening_fixes.sql',
       '000016_production_hardening.sql',
+      '000017_consistency_fixes.sql',
+      '000018_message_status_expansion.sql',
+      '000019_audit_logs_nullable_resource_id.sql',
+      '000020_grant_service_role_permissions.sql',
+      '000021_circuit_breaker_security.sql',
+      '000022_audit_worm_trigger.sql',
     ];
 
     expect(migrationFiles).toEqual(expectedNames);
@@ -107,7 +119,8 @@ describe('Migration Structure', () => {
         // Check for CREATE/INSERT/UPDATE that would recreate these
         const createsObject = new RegExp(`(CREATE|INSERT|UPDATE).*${obj}`, 'i').test(content) &&
           !content.includes(`DROP`) &&
-          !content.includes(`ROLLBACK`);
+          !content.includes(`ROLLBACK`) &&
+          !new RegExp(`CREATE.*atomic_${obj}`, 'i').test(content);
 
         if (createsObject && !isRollback) {
           throw new Error(`File ${file} creates/references removed object: ${obj}`);
@@ -160,6 +173,12 @@ describe('Migration Structure', () => {
       '000014_kill_switch',
       '000015_hardening_fixes',
       '000016_production_hardening',
+      '000017_consistency_fixes',
+      '000018_message_status_expansion',
+      '000019_audit_logs_nullable_resource_id',
+      '000020_grant_service_role_permissions',
+      '000021_circuit_breaker_security',
+      '000022_audit_worm_trigger',
     ];
 
     migrationFiles.forEach((file, i) => {

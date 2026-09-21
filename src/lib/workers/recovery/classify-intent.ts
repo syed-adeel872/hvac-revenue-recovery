@@ -1,5 +1,29 @@
 import { IntentType } from './types';
 
+const INJECTION_PATTERNS: RegExp[] = [
+  /ignore\s+(all\s+)?previous\s+instructions/i,
+  /ignore\s+(all\s+)?prior\s+instructions/i,
+  /disregard\s+(all\s+)?(previous|prior|above)\s+instructions/i,
+  /forget\s+(all\s+)?(previous|prior|above)\s+instructions/i,
+  /you\s+are\s+now\s+(a|an)\s+/i,
+  /system\s*:\s*/i,
+  /act\s+as\s+if\s+you\s+(are|were)/i,
+  /pretend\s+you\s+(are|were|have\s+no)/i,
+  /new\s+instructions?\s*:/i,
+  /override\s+(all\s+)?(previous|prior|system)/i,
+  /bypass\s+(all\s+)?(safety|rules|restrictions)/i,
+  /send\s+(me\s+)?(the\s+)?(database|db|credentials|secrets?|password|api[_\s]?key)/i,
+  /reveal\s+(the\s+)?(database|db|credentials|secrets?|password|api[_\s]?key)/i,
+  /<\|im_start\|>/i,
+  /<\|im_end\|>/i,
+  /\[INST\]/i,
+  /<<SYS>>/i,
+];
+
+export function detectPromptInjection(text: string): boolean {
+  return INJECTION_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 const KEYWORD_RULES: Array<{ intent: IntentType; patterns: RegExp[] }> = [
   {
     intent: 'opt_out',
@@ -55,6 +79,10 @@ export function classifyIntentDeterministic(text: string): IntentType | null {
 }
 
 export function classifyIntent(text: string): IntentType {
+  if (detectPromptInjection(text)) {
+    return 'general_question';
+  }
+
   const deterministic = classifyIntentDeterministic(text);
   if (deterministic) return deterministic;
 

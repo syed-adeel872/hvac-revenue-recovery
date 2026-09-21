@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/v1/jobs/process-webhooks",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/v1/jobs/run-pipeline",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

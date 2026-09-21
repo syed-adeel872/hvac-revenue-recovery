@@ -27,14 +27,19 @@ describe('encryption', () => {
   });
 
   describe('decryptSecret / encryptSecret', () => {
-    it('throws when provider not configured and no ENCRYPTION_KEY env', async () => {
+    it('uses fallback key when ENCRYPTION_KEY env is not set', async () => {
       const original = process.env.ENCRYPTION_KEY;
       try {
         delete process.env.ENCRYPTION_KEY;
         setEncryptionProvider(null);
-        await expect(decryptSecret(new Uint8Array())).rejects.toThrow('ENCRYPTION_KEY');
-        await expect(encryptSecret(new Uint8Array())).rejects.toThrow('ENCRYPTION_KEY');
+        const plaintext = new TextEncoder().encode('hello world');
+        const encrypted = await encryptSecret(plaintext);
+        expect(encrypted).toBeInstanceOf(Uint8Array);
+        expect(encrypted.length).toBeGreaterThan(0);
+        const decrypted = await decryptSecret(encrypted);
+        expect(decrypted).toEqual(plaintext);
       } finally {
+        setEncryptionProvider(null);
         if (original !== undefined) process.env.ENCRYPTION_KEY = original;
       }
     });

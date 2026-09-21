@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "simulate": "node scripts/simulate-traffic.js",
+    "seed:admin": "node scripts/create-admin.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",

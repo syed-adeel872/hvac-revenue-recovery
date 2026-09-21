@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SafetyEvaluationContext, SafetyResult } from './types';
-import { checkConsentStatus } from './consent-checker';
+import { checkConsentStatus, checkOptOutStatus, checkOptOutKeywords } from './consent-checker';
 import { loadClientPolicies } from './policy-engine';
 
 export async function evaluateSafety(
@@ -46,6 +46,35 @@ export async function evaluateSafety(
       result.reason = 'Consent has expired';
       result.rules.push('consent_expired');
       return result;
+    }
+
+    if (consent.status === 'pending') {
+      result.decision = 'ESCALATE';
+      result.reason = 'Consent status is pending — not yet granted';
+      result.rules.push('consent_pending');
+      return result;
+    }
+
+    const optOutStatus = await checkOptOutStatus(supabase, context.clientId, context.customerId);
+    if (optOutStatus) {
+      result.decision = 'BLOCK';
+      result.reason = 'Customer has opted out';
+      result.rules.push('opt_out');
+      return result;
+    }
+
+    const messageContent = context.metadata?.messageContent as string | undefined;
+    if (messageContent) {
+      const words = messageContent.trim().toLowerCase().split(/\s+/);
+      for (const word of words) {
+        const match = await checkOptOutKeywords(supabase, context.clientId, word, context.channel);
+        if (match) {
+          result.decision = 'BLOCK';
+          result.reason = `Message contains configured opt-out keyword: "${match.keyword}"`;
+          result.rules.push('opt_out_keyword');
+          return result;
+        }
+      }
     }
 
     const policies = await loadClientPolicies(supabase, context.clientId);

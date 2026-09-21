@@ -44,7 +44,6 @@ export interface Lead {
   metadata: Json | null
   created_at: string
   updated_at: string
-  deleted_at: string | null
 }
 
 export interface Estimate {
@@ -106,7 +105,7 @@ export interface Message {
   channel: 'sms' | 'email' | 'phone' | 'chat'
   content: string
   external_message_id: string | null
-  status: 'pending' | 'sent' | 'delivered' | 'failed' | 'received'
+  status: 'pending' | 'sent' | 'delivered' | 'failed' | 'received' | 'processing' | 'processed'
   sent_at: string | null
   delivered_at: string | null
   failed_at: string | null
@@ -209,7 +208,7 @@ export interface AuditLog {
   actor_id: string | null
   action: string
   resource_type: string
-  resource_id: string
+  resource_id: string | null
   old_values: Json | null
   new_values: Json | null
   metadata: Json | null
@@ -260,4 +259,167 @@ export interface CostLedger {
   metadata: Json | null
   incurred_at: string
   created_at: string
+}
+
+export interface Client {
+  id: string
+  name: string
+  display_name: string | null
+  timezone: string
+  currency: string
+  status: 'active' | 'suspended' | 'archived'
+  settings: Json
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+  kill_switch_enabled: boolean
+}
+
+export interface ClientMember {
+  id: string
+  client_id: string
+  user_id: string
+  email: string
+  role: 'owner' | 'admin' | 'member' | 'viewer'
+  status: 'active' | 'invited' | 'suspended' | 'revoked'
+  invited_by: string | null
+  invited_at: string | null
+  accepted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OptOutKeyword {
+  id: string
+  client_id: string
+  keyword: string
+  channel: 'sms' | 'email' | 'phone_call' | 'all'
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkerAuthorization {
+  id: string
+  client_id: string
+  worker_id: string
+  worker_type: 'intelligence' | 'recovery' | 'safety' | 'operations'
+  scope: string[]
+  status: 'active' | 'revoked' | 'expired'
+  granted_by: string | null
+  granted_at: string
+  expires_at: string | null
+  revoked_at: string | null
+  revoked_by: string | null
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+
+export interface SystemAuditLog {
+  id: string
+  actor_type: 'system' | 'migration' | 'security' | 'admin'
+  actor_id: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  client_id: string | null
+  old_values: Json | null
+  new_values: Json | null
+  metadata: Json | null
+  created_at: string
+}
+
+export interface MigrationHistory {
+  id: number
+  migration_name: string
+  applied_at: string
+  rolled_back_at: string | null
+  success: boolean
+  error_message: string | null
+}
+
+export interface WebhookProvider {
+  id: string
+  client_id: string
+  provider_name: string
+  display_name: string
+  status: 'active' | 'paused' | 'revoked'
+  auth_type: 'hmac_sha256' | 'hmac_sha1' | 'bearer_token' | 'basic_auth' | 'custom_header'
+  secret_ref: string
+  header_name: string | null
+  event_type_mapping: Json
+  tenant_resolution: Json
+  max_payload_size_bytes: number
+  allowed_ips: string[] | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WebhookCredential {
+  id: string
+  provider_id: string
+  client_id: string
+  encrypted_secret: string
+  secret_version: number
+  algorithm: string
+  created_by: string | null
+  created_at: string
+  expires_at: string | null
+}
+
+export interface IngestionEvent {
+  id: string
+  client_id: string
+  provider_id: string
+  external_event_id: string
+  provider_event_type: string
+  internal_event_type: string | null
+  raw_payload: Json
+  raw_headers: Json
+  idempotency_key: string
+  provider_event_timestamp: string | null
+  received_at: string
+  status: 'received' | 'processing' | 'mapped' | 'workflow_created' | 'completed' | 'failed' | 'retryable_failed'
+  processing_started_at: string | null
+  processing_completed_at: string | null
+  retry_count: number
+  last_error: string | null
+  last_error_at: string | null
+  correlation_id: string | null
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+
+export interface IngestionProcessingLog {
+  id: string
+  ingestion_event_id: string
+  client_id: string
+  stage: 'signature_verify' | 'schema_validate' | 'duplicate_check' | 'persist' | 'tenant_resolve' | 'event_map' | 'workflow_create' | 'complete'
+  status: 'started' | 'success' | 'failed' | 'retry'
+  error_message: string | null
+  duration_ms: number | null
+  metadata: Json
+  created_at: string
+}
+
+export interface CircuitBreakerState {
+  id: string
+  client_id: string
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN'
+  failure_count: number
+  last_failure_time: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SystemConfig {
+  key: string
+  value: string
+  description: string | null
+  updated_at: string
+  updated_by: string | null
 }
