@@ -23,8 +23,7 @@ const SERVICETITAN_EVENT_TYPE_MAP: Record<string, string> = {
 };
 
 export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ provider_name: string }> }
+  request: NextRequest
 ) {
   const startTime = Date.now();
   let supabase: any;
