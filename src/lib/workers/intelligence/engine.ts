@@ -26,8 +26,8 @@ export async function processEvent(options: ProcessEventOptions): Promise<Intell
     const sanitizedPayload = sanitizePayload(event.payload);
     const customerContext = extractCustomerContext(sanitizedPayload);
 
-    const daysSinceSent = calculateDaysSinceSent(sanitizedPayload);
-    const hasViewedEstimate = sanitizedPayload.viewed_at !== null && sanitizedPayload.viewed_at !== undefined;
+    const daysSinceSent = customerContext.daysSinceSent;
+    const hasViewedEstimate = customerContext.hasViewedEstimate ?? false;
     const previousFollowups = typeof sanitizedPayload.previous_followups === 'number'
       ? sanitizedPayload.previous_followups
       : 0;

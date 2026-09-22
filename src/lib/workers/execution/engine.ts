@@ -42,7 +42,7 @@ export async function markActionCompleted(
   actionId: string,
   clientId: string,
 ): Promise<void> {
-  await transitionActionStatus(supabase, actionId, 'completed', 'execution-worker');
+  await transitionActionStatus(supabase, actionId, 'completed');
 }
 
 export async function markActionFailed(
@@ -51,7 +51,7 @@ export async function markActionFailed(
   clientId: string,
   errorMessage: string,
 ): Promise<void> {
-  await transitionActionStatus(supabase, actionId, 'failed', 'execution-worker', undefined, errorMessage);
+  await transitionActionStatus(supabase, actionId, 'failed', undefined, undefined, errorMessage);
 }
 
 export async function markActionRejected(
@@ -60,7 +60,7 @@ export async function markActionRejected(
   clientId: string,
   reason: string,
 ): Promise<void> {
-  await transitionActionStatus(supabase, actionId, 'rejected', 'execution-worker', undefined, reason);
+  await transitionActionStatus(supabase, actionId, 'rejected', undefined, undefined, reason);
 }
 
 export async function processRecoveryAction(

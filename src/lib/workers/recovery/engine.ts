@@ -239,15 +239,15 @@ async function createRecoveryAction(
 }
 
 async function markActionCompleted(supabase: any, action: ClaimedAction): Promise<void> {
-  await transitionActionStatus(supabase, action.id, 'completed', 'recovery-worker');
+  await transitionActionStatus(supabase, action.id, 'completed');
 }
 
 async function markActionRejected(supabase: any, action: ClaimedAction, reason: string): Promise<void> {
-  await transitionActionStatus(supabase, action.id, 'rejected', 'recovery-worker', undefined, reason);
+  await transitionActionStatus(supabase, action.id, 'rejected', undefined, undefined, reason);
 }
 
 async function markActionFailed(supabase: any, action: ClaimedAction, errorMessage: string): Promise<void> {
-  await transitionActionStatus(supabase, action.id, 'failed', 'recovery-worker', undefined, errorMessage);
+  await transitionActionStatus(supabase, action.id, 'failed', undefined, undefined, errorMessage);
 }
 
 export interface ProcessBatchOptions {

@@ -73,6 +73,20 @@ export function sanitizePayload(payload: Record<string, unknown>): Record<string
   return sanitized;
 }
 
+function flattenRawPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  if (!payload.raw_payload || typeof payload.raw_payload !== 'object') {
+    return payload;
+  }
+  const raw = payload.raw_payload as Record<string, unknown>;
+  const flat: Record<string, unknown> = { ...payload };
+  for (const [key, value] of Object.entries(raw)) {
+    const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+    flat[camelKey] = value;
+    flat[key] = value;
+  }
+  return flat;
+}
+
 export function extractCustomerContext(payload: Record<string, unknown>): {
   customerName?: string;
   customerEmail?: string;
@@ -81,21 +95,44 @@ export function extractCustomerContext(payload: Record<string, unknown>): {
   estimateStatus?: string;
   leadStatus?: string;
   serviceName?: string;
+  daysSinceSent?: number;
+  hasViewedEstimate?: boolean;
 } {
-  const name = payload.customer_name || payload.customerName;
-  const email = payload.customer_email || payload.customerEmail;
-  const phone = payload.customer_phone || payload.customerPhone;
-  const status = payload.status;
-  const leadStatus = payload.lead_status || payload.leadStatus;
-  const service = payload.service_name || payload.serviceName;
+  const flat = flattenRawPayload(payload);
+
+  const name = flat.customer_name || flat.customerName || flat.CustomerName;
+  const email = flat.customer_email || flat.customerEmail || flat.CustomerEmail;
+  const phone = flat.customer_phone || flat.customerPhone || flat.CustomerPhone;
+  const status = flat.status || flat.Status;
+  const leadStatus = flat.lead_status || flat.leadStatus || flat.LeadStatus;
+  const service = flat.service_name || flat.serviceName || flat.ServiceType || flat.serviceType;
+
+  const estimateAmountRaw = flat.total_amount || flat.estimateAmount || flat.EstimateAmount || flat.estimate_amount;
+  const estimateAmount = typeof estimateAmountRaw === 'number' ? estimateAmountRaw : undefined;
+
+  let daysSinceSent: number | undefined;
+  const sentDate = flat.sent_at || flat.sentAt || flat.SentAt || flat.estimateSentDate || flat.EstimateSentDate;
+  if (sentDate && typeof sentDate === 'string') {
+    const sent = new Date(sentDate);
+    const now = new Date();
+    daysSinceSent = Math.floor((now.getTime() - sent.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  let hasViewedEstimate = false;
+  const viewedDate = flat.viewed_at || flat.viewedAt || flat.ViewedAt || flat.estimateViewedDate || flat.EstimateViewedDate;
+  if (viewedDate && typeof viewedDate === 'string') {
+    hasViewedEstimate = new Date(viewedDate).getTime() > 0;
+  }
 
   return {
     customerName: name ? truncateField(name) : undefined,
     customerEmail: email ? truncateField(email) : undefined,
     customerPhone: phone ? truncateField(phone) : undefined,
-    estimateAmount: typeof payload.total_amount === 'number' ? payload.total_amount : undefined,
+    estimateAmount,
     estimateStatus: status ? truncateField(status) : undefined,
     leadStatus: leadStatus ? truncateField(leadStatus) : undefined,
     serviceName: service ? truncateField(service) : undefined,
+    daysSinceSent,
+    hasViewedEstimate,
   };
 }
