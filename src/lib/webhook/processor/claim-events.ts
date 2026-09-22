@@ -27,8 +27,7 @@ export async function claimEvents(
       received_at,
       status,
       retry_count,
-      metadata,
-      webhook_providers!inner(provider_name)
+      metadata
     `)
     .in('status', ['received', 'retryable_failed'])
     .order('received_at', { ascending: true })
@@ -46,6 +45,19 @@ export async function claimEvents(
 
   if (!events || events.length === 0) {
     return [];
+  }
+
+  // Resolve provider names separately to avoid PostgREST FK ambiguity
+  const providerIds = [...new Set(events.map((e: any) => e.provider_id))];
+  const { data: providers } = await supabase
+    .from('webhook_providers')
+    .select('id, provider_name')
+    .in('id', providerIds);
+  const providerNameMap: Record<string, string> = {};
+  if (providers) {
+    for (const p of providers) {
+      providerNameMap[p.id] = p.provider_name;
+    }
   }
 
   const eventIds = events.map((e: any) => e.id);
@@ -77,7 +89,7 @@ export async function claimEvents(
       id: e.id,
       clientId: e.client_id,
       providerId: e.provider_id,
-      providerName: e.webhook_providers?.provider_name || 'unknown',
+      providerName: providerNameMap[e.provider_id] || 'unknown',
       externalEventId: e.external_event_id,
       providerEventType: e.provider_event_type,
       internalEventType: e.internal_event_type,

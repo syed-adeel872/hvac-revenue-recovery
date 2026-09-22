@@ -25,11 +25,16 @@ export async function createWorkflowEvent(
     throw new Error(`Failed to create workflow event: ${error.message}`);
   }
 
-  if (!data || data.length === 0) {
+  if (!data) {
     throw new Error('Workflow event creation returned no data');
   }
 
-  const workflowEvent = data[0];
+  // Supabase RPC returns a single object for RETURNS <type>, or array for RETURNS SETOF
+  const workflowEvent = Array.isArray(data) ? data[0] : data;
+
+  if (!workflowEvent || !workflowEvent.id) {
+    throw new Error('Workflow event creation returned invalid data');
+  }
 
   const { data: existing } = await supabase
     .from('workflow_events')

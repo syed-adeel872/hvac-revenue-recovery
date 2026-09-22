@@ -58,9 +58,11 @@ export interface ClaimedWorkflowEvent {
 
 export const PROCESSED_EVENT_TYPES = [
   'estimate_sent',
+  'estimate_unbooked',
   'unbooked_estimate',
   'lead_created',
   'estimate_updated',
+  'estimate_created',
 ] as const;
 
 export const CONFIDENCE_THRESHOLD = 0.70;
