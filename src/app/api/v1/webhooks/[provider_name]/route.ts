@@ -86,7 +86,18 @@ export async function POST(
       return NextResponse.json(body, { status });
     }
 
-    const encryptedSecret = new Uint8Array(credential as unknown as ArrayBuffer);
+    // Supabase returns bytea as hex string (\x...). Convert to Uint8Array for decryption.
+    let encryptedSecret: Uint8Array;
+    if (typeof credential === 'string') {
+      const hex = credential.startsWith('\\x') ? credential.slice(2) : credential;
+      encryptedSecret = new Uint8Array(hex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
+    } else if (credential instanceof Uint8Array) {
+      encryptedSecret = credential;
+    } else if (credential instanceof ArrayBuffer) {
+      encryptedSecret = new Uint8Array(credential);
+    } else {
+      encryptedSecret = new Uint8Array(credential as unknown as ArrayBuffer);
+    }
 
     const headers: Record<string, string> = {};
     request.headers.forEach((value, key) => {
