@@ -44,7 +44,33 @@ export async function claimRecoveryActions(
       continue;
     }
 
-    claimed.push(updated as unknown as ClaimedRecoveryAction);
+    claimed.push({
+      id: updated.id,
+      clientId: updated.client_id,
+      customerId: updated.customer_id,
+      leadId: updated.lead_id,
+      estimateId: updated.estimate_id,
+      conversationId: updated.conversation_id,
+      bookingId: updated.booking_id,
+      workflowEventId: updated.workflow_event_id,
+      workerType: updated.worker_type,
+      actionType: updated.action_type,
+      riskLevel: updated.risk_level,
+      status: updated.status,
+      input: updated.input,
+      output: updated.output,
+      approvalRequired: updated.approval_required,
+      approvedBy: updated.approved_by,
+      approvedAt: updated.approved_at,
+      rejectionReason: updated.rejection_reason,
+      startedAt: updated.started_at,
+      completedAt: updated.completed_at,
+      errorMessage: updated.error_message,
+      metadata: updated.metadata,
+      createdAt: updated.created_at,
+      updatedAt: updated.updated_at,
+      idempotencyKey: updated.idempotency_key,
+    } as unknown as ClaimedRecoveryAction);
   }
 
   return claimed;

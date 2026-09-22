@@ -40,7 +40,8 @@ export async function checkKillSwitch(
       .single();
 
     if (error) {
-      return { enabled: true, reason: 'Failed to check kill switch status' };
+      console.error('[KillSwitch] clients query error:', JSON.stringify({ code: error.code, message: error.message, details: error.details, hint: error.hint }));
+      return { enabled: true, reason: `Failed to check kill switch status: ${error.message}` };
     }
 
     if (!data) {
@@ -52,7 +53,8 @@ export async function checkKillSwitch(
     }
 
     return { enabled: false };
-  } catch {
+  } catch (e) {
+    console.error('[KillSwitch] checkKillSwitch exception:', e instanceof Error ? e.message : 'Unknown error');
     return { enabled: true, reason: 'Kill switch check failed - defaulting to blocked' };
   }
 }
