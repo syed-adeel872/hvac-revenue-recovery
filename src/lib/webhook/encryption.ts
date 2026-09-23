@@ -21,14 +21,21 @@ export function getEncryptionProvider(): EncryptionProvider | null {
 function ensureEncryptionProvider(): EncryptionProvider {
   if (encryptionProvider) return encryptionProvider;
 
+  const isProduction = process.env.NODE_ENV === 'production';
   let keyHex = process.env.ENCRYPTION_KEY;
   if (!keyHex) {
+    if (isProduction) {
+      throw new Error('ENCRYPTION_KEY must be set in production (32-byte hex / 64 hex chars)');
+    }
     console.warn('[Encryption] ENCRYPTION_KEY not set — using development fallback key. DO NOT use in production.');
     keyHex = '0000000000000000000000000000000000000000000000000000000000000001';
   }
 
   const keyBytes = hexToBytes(keyHex);
   if (keyBytes.length !== 32) {
+    if (isProduction) {
+      throw new Error(`ENCRYPTION_KEY must be 32 bytes (64 hex chars). Got ${keyBytes.length} bytes`);
+    }
     console.warn(`[Encryption] ENCRYPTION_KEY must be 32 bytes (64 hex chars). Got ${keyBytes.length} bytes. Using fallback.`);
     const fallback = new Uint8Array(32);
     fallback[31] = 1;

@@ -27,10 +27,12 @@ describe('encryption', () => {
   });
 
   describe('decryptSecret / encryptSecret', () => {
-    it('uses fallback key when ENCRYPTION_KEY env is not set', async () => {
+    it('uses fallback key when ENCRYPTION_KEY env is not set (non-production)', async () => {
       const original = process.env.ENCRYPTION_KEY;
+      const originalNodeEnv = process.env.NODE_ENV;
       try {
         delete process.env.ENCRYPTION_KEY;
+        process.env.NODE_ENV = 'test';
         setEncryptionProvider(null);
         const plaintext = new TextEncoder().encode('hello world');
         const encrypted = await encryptSecret(plaintext);
@@ -41,6 +43,24 @@ describe('encryption', () => {
       } finally {
         setEncryptionProvider(null);
         if (original !== undefined) process.env.ENCRYPTION_KEY = original;
+        if (originalNodeEnv !== undefined) process.env.NODE_ENV = originalNodeEnv;
+        else delete process.env.NODE_ENV;
+      }
+    });
+
+    it('throws when ENCRYPTION_KEY is missing in production', async () => {
+      const original = process.env.ENCRYPTION_KEY;
+      const originalNodeEnv = process.env.NODE_ENV;
+      try {
+        delete process.env.ENCRYPTION_KEY;
+        process.env.NODE_ENV = 'production';
+        setEncryptionProvider(null);
+        await expect(encryptSecret(new TextEncoder().encode('x'))).rejects.toThrow('ENCRYPTION_KEY must be set in production');
+      } finally {
+        setEncryptionProvider(null);
+        if (original !== undefined) process.env.ENCRYPTION_KEY = original;
+        if (originalNodeEnv !== undefined) process.env.NODE_ENV = originalNodeEnv;
+        else delete process.env.NODE_ENV;
       }
     });
 
