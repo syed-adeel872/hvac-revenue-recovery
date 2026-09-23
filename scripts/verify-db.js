@@ -1,4 +1,5 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.local') });
+const { loadEnv } = require('./load-env');
+loadEnv();
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
@@ -11,7 +12,6 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false }
 });

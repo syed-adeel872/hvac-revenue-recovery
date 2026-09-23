@@ -1,4 +1,5 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.local') });
+const { loadEnv } = require('./load-env');
+loadEnv();
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -75,7 +76,8 @@ async function runAllMigrations() {
   console.log('='.repeat(60));
   console.log('SUPABASE DATABASE MIGRATION RUNNER');
   console.log('='.repeat(60));
-  console.log(`Project: vsvwuihteblsmnkuqodt`);
+  const projectRef = process.env.SUPABASE_PROJECT_REF || new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://localhost').hostname.split('.')[0];
+  console.log(`Project: ${projectRef}`);
   console.log(`Migrations: ${EXPECTED_MIGRATIONS.length}`);
   console.log(`Mode: Individual execution (each migration in own transaction)`);
   console.log('');

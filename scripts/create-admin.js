@@ -1,27 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { Client } = require('pg');
-const path = require('path');
-const fs = require('fs');
-
-function loadEnv() {
-  const envPath = path.resolve(__dirname, '../.env.local');
-  if (!fs.existsSync(envPath)) {
-    console.error('ERROR: .env.local not found');
-    process.exit(1);
-  }
-  const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIndex = trimmed.indexOf('=');
-    if (eqIndex === -1) continue;
-    const key = trimmed.slice(0, eqIndex).trim();
-    const value = trimmed.slice(eqIndex + 1).trim();
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
-  }
-}
+const { loadEnv } = require('./load-env');
 
 loadEnv();
 
@@ -40,9 +19,19 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 
 const pg = new Client({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-const ADMIN_EMAIL = 'REMOVED_EMAIL';
-const ADMIN_PASSWORD = 'REMOVED_SECRET';
-const DEFAULT_CLIENT_NAME = 'Default HVAC Company';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const DEFAULT_CLIENT_NAME = process.env.DEFAULT_CLIENT_NAME || 'Default HVAC Company';
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.error('ERROR: ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env.local (or the environment)');
+  console.error('Generate a password with: openssl rand -base64 24');
+  process.exit(1);
+}
+if (ADMIN_PASSWORD.length < 12) {
+  console.error('ERROR: ADMIN_PASSWORD must be at least 12 characters long');
+  process.exit(1);
+}
 
 async function ensureAuthUser() {
   console.log('Checking for existing admin user...');

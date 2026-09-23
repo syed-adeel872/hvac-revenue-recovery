@@ -61,7 +61,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-3 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors"
-              placeholder="REMOVED_EMAIL"
+              placeholder="you@yourcompany.com"
             />
           </div>
           <div>
