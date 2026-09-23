@@ -32,7 +32,7 @@ describe('encryption', () => {
       const originalNodeEnv = process.env.NODE_ENV;
       try {
         delete process.env.ENCRYPTION_KEY;
-        process.env.NODE_ENV = 'test';
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'test';
         setEncryptionProvider(null);
         const plaintext = new TextEncoder().encode('hello world');
         const encrypted = await encryptSecret(plaintext);
@@ -43,8 +43,11 @@ describe('encryption', () => {
       } finally {
         setEncryptionProvider(null);
         if (original !== undefined) process.env.ENCRYPTION_KEY = original;
-        if (originalNodeEnv !== undefined) process.env.NODE_ENV = originalNodeEnv;
-        else delete process.env.NODE_ENV;
+        if (originalNodeEnv !== undefined) {
+          (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
+        } else {
+          delete (process.env as Record<string, string | undefined>).NODE_ENV;
+        }
       }
     });
 
@@ -53,14 +56,17 @@ describe('encryption', () => {
       const originalNodeEnv = process.env.NODE_ENV;
       try {
         delete process.env.ENCRYPTION_KEY;
-        process.env.NODE_ENV = 'production';
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
         setEncryptionProvider(null);
         await expect(encryptSecret(new TextEncoder().encode('x'))).rejects.toThrow('ENCRYPTION_KEY must be set in production');
       } finally {
         setEncryptionProvider(null);
         if (original !== undefined) process.env.ENCRYPTION_KEY = original;
-        if (originalNodeEnv !== undefined) process.env.NODE_ENV = originalNodeEnv;
-        else delete process.env.NODE_ENV;
+        if (originalNodeEnv !== undefined) {
+          (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
+        } else {
+          delete (process.env as Record<string, string | undefined>).NODE_ENV;
+        }
       }
     });
 
